@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="El Imperio del Taco"><meta name="theme-color" content="#c2410c"><title>El Imperio del Taco</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f6f5f1;--card:#fff;--tx:#1c1c1a;--mu:#6b6a64;--bd:#ddd9cf;--ac:#c2410c;--g:#16a34a;--y:#d97706;--r:#dc2626;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--card:#222226;--tx:#f0efea;--mu:#9d9b93;--bd:#37373d}}
+:root[data-theme="dark"]{--bg:#17171a;--card:#222226;--tx:#f0efea;--mu:#9d9b93;--bd:#37373d}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.w{max-width:760px;margin:0 auto;padding:12px}
+h1{font-size:19px;margin:4px 0 10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto}
+.tabs button{flex:1;white-space:nowrap;padding:10px 8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.top button{font-size:16px}
+label{display:block;font-size:12px;color:var(--mu);margin:8px 0 3px}
+input,select{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:15px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.btn{padding:11px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font-weight:600;font-size:15px;cursor:pointer;width:100%;margin-top:10px}
+.btn.s{background:var(--g)}.btn.o{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+.btn.x{width:auto;margin:0;padding:4px 9px;background:none;color:var(--mu);border:1px solid var(--bd)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:7px 4px;text-align:left;border-bottom:1px solid var(--bd)}
+th{font-size:12px;color:var(--mu)}
+.sc{overflow-x:auto}
+.in{color:var(--g);font-weight:600}.out{color:var(--r);font-weight:600}
+.pill{display:inline-block;padding:3px 9px;border-radius:99px;color:#fff;font-size:12px;font-weight:600}
+.sum{display:flex;gap:8px;margin:8px 0}.sum div{flex:1;background:var(--bg);border-radius:8px;padding:8px;text-align:center}.sum b{display:block;font-size:17px}
+.mu{color:var(--mu);font-size:13px}
+#lock{max-width:340px;margin:12vh auto;text-align:center}
+.msg{color:var(--r);font-size:13px;min-height:18px}
+body{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}input{-webkit-user-select:text;user-select:text}
+@media(min-width:768px){body{font-size:17px}.w{max-width:980px;padding:22px}h1{font-size:28px}input,select{padding:14px;font-size:17px}.tabs button{padding:15px;font-size:17px}.btn{padding:15px;font-size:17px}th,td{padding:11px 7px;font-size:16px}.sum b{font-size:22px}}
+</style></head><body>
+<div class="w" id="app"></div>
+<script>
+var K='inv_app_v1',S={pin:'',movs:[],ventas:[]},tab='ven',sub='reg',auth=false,hp='day',hd='',vd='',mf='',dl=null,DEV='',OWN=false,DB=null,gate='chk',BK=null,RQ=[],AP=[],bt=null,lastBk='';
+function load(){try{var r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}}
+function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}schedBk()}
+function h(s){var x=0;s=String(s);for(var i=0;i<s.length;i++)x=(x*31+s.charCodeAt(i))|0;return 'p'+x}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function today(){return ymd(new Date())}
+function nowt(){return new Date().toTimeString().slice(0,5)}
+function n(v){return Math.round(v*100)/100}
+function $(i){return document.getElementById(i)}
+function names(){var s={};S.movs.forEach(function(m){s[m.p]=1});return Object.keys(s).sort()}
+function sales_names(){var s={};S.ventas.forEach(function(m){s[m.p]=1});return Object.keys(s).sort()}
+function inRange(f){
+  var d=new Date(hd+'T12:00:00');
+  if(hp==='day')return f===hd;
+  if(hp==='month')return f.slice(0,7)===hd.slice(0,7);
+  var dow=(d.getDay()+6)%7,a=new Date(d);a.setDate(d.getDate()-dow);var b=new Date(a);b.setDate(a.getDate()+6);
+  return f>=ymd(a)&&f<=ymd(b)}
+function rangeLabel(){
+  var d=new Date(hd+'T12:00:00');
+  if(hp==='day')return hd;if(hp==='month')return hd.slice(0,7);
+  var dow=(d.getDay()+6)%7,a=new Date(d);a.setDate(d.getDate()-dow);var b=new Date(a);b.setDate(a.getDate()+6);
+  return ymd(a)+' al '+ymd(b)}
+
+/* ---------- Acceso ---------- */
+function lockView(){
+  var first=!S.pin;
+  $('app').innerHTML='<div id="lock" class="card"><h1>'+(first?'Configurar administrador':'Acceso protegido')+'</h1><p class="mu">'+(first?'Este dispositivo quedará autorizado. Crea tu PIN de administrador.':'Ingresa tu PIN de administrador.')+'</p><input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">'+(first?'<input id="pin2" type="password" inputmode="numeric" placeholder="Repite el PIN" style="margin-top:8px">':'')+'<div class="msg" id="lm"></div><button class="btn" onclick="enter()">'+(first?'Guardar y entrar':'Entrar')+'</button></div>'}
+function enter(){
+  var p=$('pin').value;
+  if(!S.pin){
+    if(p.length<4){$('lm').textContent='Mínimo 4 dígitos';return}
+    if(p!==$('pin2').value){$('lm').textContent='Los PIN no coinciden';return}
+    S.pin=h(p);save();auth=true;hd=vd=today();render()
+  }else if(h(p)===S.pin){auth=true;hd=vd=today();render()}
+  else $('lm').textContent='PIN incorrecto'}
+function logout(){auth=false;lockView()}
+function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){return m.p===v}).pop();if(l)$('u').value=l.u}
+
+/* ---------- Estructura ---------- */
+function render(){
+  if(gate!=='ok')return gateView();
+  if(!auth)return lockView();
+  var t=function(id,l,cur,fn){return '<button class="'+(cur===id?'on':'')+'" onclick="'+fn+'(\''+id+'\')">'+l+'</button>'};
+  var out='<h1>🌮 El Imperio del Taco <button class="btn x" style="float:right" onclick="logout()">Bloquear</button></h1><div class="mu" id="bk" style="margin:-6px 0 8px">'+(lastBk?'☁ Respaldo '+lastBk:'')+'</div>'+(BK?'<div class="card">Hay datos respaldados en la nube. <button class="btn s" onclick="restore()">Restaurar datos</button></div>':'')+'<div class="tabs top">'+t('ven','💰 Venta del día',tab,'setTab')+t('inv','📦 Inventario',tab,'setTab')+(0?t('dev','🔐 Dispositivos',tab,'setTab'):'')+'</div>';
+  if(tab==='inv'){
+    out+='<div class="tabs">'+t('reg','1 Registro',sub,'setSub')+t('his','2 Historial',sub,'setSub')+t('mov','3 Movimientos',sub,'setSub')+t('stk','4 Stock',sub,'setSub')+'</div>'+({reg:vReg,his:vHis,mov:vMov,stk:vStk}[sub])();
+  }else out+=vVen();
+  $('app').innerHTML=out}
+function setTab(x){tab=x;render()}
+function setSub(x){sub=x;render()}
+function dlist(){return '<datalist id="dl">'+names().map(function(x){return '<option value="'+esc(x)+'">'}).join('')+'</datalist>'}
+
+/* ---------- 1 Registro ---------- */
+function vReg(){
+  return '<div class="card"><b>Registrar entrada o salida</b>'+dlist()+
+  '<label>Elegir un producto ya registrado</label><select onchange="pick(this.value)"><option value="">— Seleccionar —</option>'+names().map(function(x){return '<option>'+esc(x)+'</option>'}).join('')+'</select><label>O escribir uno nuevo</label><input id="p" list="dl" placeholder="Ej: Carne">'+
+  '<div class="row"><div><label>Cantidad</label><input id="c" type="number" inputmode="decimal" min="0" step="any"></div><div><label>Unidad</label><select id="u"><option>libras</option><option>unidades</option><option>kg</option><option>litros</option><option>cajas</option><option>bolsas</option></select></div></div>'+
+  '<div class="row"><div><label>Fecha</label><input id="f" type="date" value="'+today()+'"></div><div><label>Nota (opcional)</label><input id="nt"></div></div>'+
+  '<div class="row"><button class="btn s" onclick="addMov(\'entrada\')">＋ Agregué</button><button class="btn" onclick="addMov(\'salida\')">－ Retiré</button></div><div class="msg" id="rm"></div></div>'+
+  '<div class="card"><button class="btn o" style="margin:0" onclick="exportInv()">⬇ Exportar inventario a Excel</button><p class="mu" style="margin:8px 0 0">Todo se guarda automáticamente en cada cambio.</p></div>'}
+function addMov(tipo){
+  var p=$('p').value.trim(),c=parseFloat($('c').value);
+  if(!p||!(c>0)){$('rm').textContent='Escribe el producto y una cantidad mayor a 0';return}
+  var ex=names().filter(function(x){return x.toLowerCase()===p.toLowerCase()})[0];if(ex)p=ex;
+  S.movs.push({id:Date.now(),f:$('f').value||today(),t:nowt(),p:p,tipo:tipo,c:c,u:$('u').value,nt:$('nt').value.trim()});
+  save();render();$('rm').textContent='✓ Guardado: '+(tipo==='entrada'?'entrada':'salida')+' de '+c+' '+p}
+function delMov(id){S.movs=S.movs.filter(function(m){return m.id!==id});save();render()}
+
+/* ---------- 2 Historial ---------- */
+function vHis(){
+  var l=S.movs.filter(function(m){return inRange(m.f)}).sort(function(a,b){return (b.f+b.t)<(a.f+a.t)?-1:1});
+  var e=0,s=0;l.forEach(function(m){m.tipo==='entrada'?e+=m.c:s+=m.c});
+  return '<div class="card"><div class="tabs">'+['day|Día','week|Semana','month|Mes'].map(function(x){var a=x.split('|');return '<button class="'+(hp===a[0]?'on':'')+'" onclick="hp=\''+a[0]+'\';render()">'+a[1]+'</button>'}).join('')+'</div>'+
+  '<input type="date" value="'+hd+'" onchange="hd=this.value||today();render()"><p class="mu">Mostrando: '+rangeLabel()+'</p>'+
+  '<div class="sum"><div><b class="in">'+n(e)+'</b>entradas</div><div><b class="out">'+n(s)+'</b>salidas</div><div><b>'+l.length+'</b>registros</div></div>'+movTable(l)+'</div>'}
+function movTable(l){
+  if(!l.length)return '<p class="mu">Sin movimientos.</p>';
+  return '<div class="sc"><table><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cant.</th><th></th></tr>'+l.map(function(m){
+    return '<tr><td>'+m.f.slice(5)+'<br><span class="mu">'+m.t+'</span></td><td>'+esc(m.p)+(m.nt?'<br><span class="mu">'+esc(m.nt)+'</span>':'')+'</td><td class="'+(m.tipo==='entrada'?'in':'out')+'">'+(m.tipo==='entrada'?'Entrada':'Salida')+'</td><td>'+m.c+' '+esc(m.u)+'</td><td><button class="btn x" onclick="delMov('+m.id+')">✕</button></td></tr>'}).join('')+'</table></div>'}
+
+/* ---------- 3 Movimientos ---------- */
+function vMov(){
+  var q=mf.toLowerCase();
+  var l=S.movs.filter(function(m){return !q||m.p.toLowerCase().indexOf(q)>-1}).sort(function(a,b){return (b.f+b.t)<(a.f+a.t)?-1:1});
+  return '<div class="card"><label style="margin-top:0">Filtrar por nombre del producto</label><input id="mf" value="'+esc(mf)+'" placeholder="Ej: carne" oninput="mf=this.value;rMov()"><div id="mt" style="margin-top:8px">'+movTable(l)+'</div></div>'}
+function rMov(){var q=mf.toLowerCase();var l=S.movs.filter(function(m){return !q||m.p.toLowerCase().indexOf(q)>-1}).sort(function(a,b){return (b.f+b.t)<(a.f+a.t)?-1:1});$('mt').innerHTML=movTable(l)}
+
+/* ---------- 4 Stock ---------- */
+function stockData(){
+  return names().map(function(p){
+    var e=0,s=0,u='';
+    S.movs.forEach(function(m){if(m.p===p){u=m.u;m.tipo==='entrada'?e+=m.c:s+=m.c}});
+    var st=n(e-s),r=e>0?st/e:0,est=(st<=0||r<0.2)?['Bajo stock','var(--r)']:(r<0.5?['Mitad de stock','var(--y)']:['Buen stock','var(--g)']);
+    return {p:p,u:u,e:n(e),s:n(s),st:st,est:est}})}
+function vStk(){
+  var d=stockData();
+  return '<div class="card">'+(d.length?d.map(function(x){return '<div style="padding:9px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+esc(x.p)+'</b><span class="pill" style="background:'+x.est[1]+'">'+x.est[0]+'</span></div><div class="mu">Total entradas: '+x.e+' '+esc(x.u)+' · Total salidas: '+x.s+' '+esc(x.u)+'</div><div>Stock actual: <b>'+x.st+' '+esc(x.u)+'</b></div></div>'}).join(''):'<p class="mu">Aún no hay productos. Ve a Registro.</p>')+
+  '<p class="mu">🟢 Buen stock: más de 50% de lo que ha entrado · 🟡 Mitad: 20%–50% · 🔴 Bajo: menos de 20% o agotado.</p></div>'}
+
+/* ---------- Venta del día ---------- */
+function vVen(){
+  var l=S.ventas.filter(function(v){return v.f===vd}).sort(function(a,b){return b.id-a.id});
+  var tot=0;l.forEach(function(v){tot+=v.c*v.pr});
+  var dl='<datalist id="dv">'+sales_names().map(function(x){return '<option value="'+esc(x)+'">'}).join('')+'</datalist>';
+  return '<div class="card"><b>Registrar venta</b>'+dl+
+  '<label>Producto</label><input id="vp" list="dv" placeholder="Ej: Tacos">'+
+  '<div class="row"><div><label>Cantidad</label><input id="vc" type="number" inputmode="decimal" min="0" step="any" value="1"></div><div><label>Precio c/u ($)</label><input id="vr" type="number" inputmode="decimal" min="0" step="any"></div></div>'+
+  '<button class="btn s" onclick="addVen()">Registrar venta</button><div class="msg" id="vm"></div></div>'+
+  '<div class="card"><b>Venta total del día</b><label>Selecciona el día</label><input type="date" value="'+vd+'" onchange="vd=this.value||today();render()">'+
+  '<div class="sum"><div><b>$'+n(tot).toFixed(2)+'</b>total del día</div><div><b>'+l.length+'</b>ventas</div></div>'+
+  (l.length?'<div class="sc"><table><tr><th>Hora</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th></th></tr>'+l.map(function(v){return '<tr><td>'+v.t+'</td><td>'+esc(v.p)+'</td><td>'+v.c+'</td><td>$'+v.pr.toFixed(2)+'</td><td><b>$'+n(v.c*v.pr).toFixed(2)+'</b></td><td><button class="btn x" onclick="delVen('+v.id+')">✕</button></td></tr>'}).join('')+'</table></div>':'<p class="mu">Sin ventas ese día.</p>')+
+  '<button class="btn o" onclick="exportVen()">⬇ Exportar ventas a Excel</button></div>'}
+function addVen(){
+  var p=$('vp').value.trim(),c=parseFloat($('vc').value),pr=parseFloat($('vr').value);
+  if(!p||!(c>0)||!(pr>=0)){$('vm').textContent='Completa producto, cantidad y precio';return}
+  var ex=sales_names().filter(function(x){return x.toLowerCase()===p.toLowerCase()})[0];if(ex)p=ex;
+  S.ventas.push({id:Date.now(),f:vd,t:nowt(),p:p,c:c,pr:pr});save();render();$('vm').textContent='✓ Venta guardada'}
+function delVen(id){S.ventas=S.ventas.filter(function(v){return v.id!==id});save();render()}
+
+/* ---------- Exportar ---------- */
+async function saveXlsx(wb,name){try{XLSX.writeFile(wb,name)}catch(e){alert('No se pudo exportar')}}
+function wbInv(){
+  var wb=XLSX.utils.book_new();
+  var mv=S.movs.slice().sort(function(a,b){return (a.f+a.t)<(b.f+b.t)?-1:1}).map(function(m){return {Fecha:m.f,Hora:m.t,Producto:m.p,Tipo:m.tipo==='entrada'?'Entrada':'Salida',Cantidad:m.c,Unidad:m.u,Nota:m.nt}});
+  var st=stockData().map(function(x){return {Producto:x.p,'Total entradas':x.e,'Total salidas':x.s,Stock:x.st,Unidad:x.u,Estado:x.est[0]}});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mv.length?mv:[{}]),'Movimientos');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(st.length?st:[{}]),'Stock');
+  return wb}
+function exportInv(){saveXlsx(wbInv(),'inventario_'+today()+'.xlsx')}
+function wbVen(){
+  var wb=XLSX.utils.book_new();
+  var v=S.ventas.slice().sort(function(a,b){return (a.f+a.t)<(b.f+b.t)?-1:1}).map(function(x){return {Fecha:x.f,Hora:x.t,Producto:x.p,Cantidad:x.c,'Precio unitario':x.pr,Total:n(x.c*x.pr)}});
+  var by={};S.ventas.forEach(function(x){by[x.f]=(by[x.f]||0)+x.c*x.pr});
+  var r=Object.keys(by).sort().map(function(k){return {Fecha:k,'Total del día':n(by[k])}});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(v.length?v:[{}]),'Ventas');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.length?r:[{}]),'Total por día');
+  return wb}
+function exportVen(){saveXlsx(wbVen(),'ventas_'+today()+'.xlsx')}
+
+
+/* ====== CONFIGURACIÓN: pega aquí la URL de tu Apps Script ====== */
+var API="https://script.google.com/macros/s/AKfycbxDRYFqVMBQ0NPTzUsBfIGrsDH0eXGiLcDaZgfxmijKBMZnlUFn1OoBiw0uqCvhcXRV/exec";
+var CODE='',pend=false;
+function api(o){o.code=CODE;o.dev=DEV;return fetch(API,{method:'POST',body:JSON.stringify(o)}).then(function(r){return r.json()})}
+function setBk(t){var e=$('bk');if(e)e.textContent=t}
+function gateView(){
+  $('app').innerHTML='<div id="lock" class="card"><h1>Dispositivo no autorizado</h1><p class="mu">Escribe el código de acceso.</p><input id="cd" placeholder="TACO-XXXX-XXXX" autocapitalize="characters" autocomplete="off"><div class="msg" id="gm"></div><button class="btn" onclick="activate()">Activar dispositivo</button></div>'}
+async function activate(){
+  var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),m=$('gm');
+  if(!c){m.textContent='Escribe el código';return}
+  m.style.color='var(--mu)';m.textContent='Verificando…';CODE=c;
+  try{var r=await api({action:'auth'});
+    if(!r.ok){m.style.color='var(--r)';m.textContent=r.msg||'Código inválido';CODE='';return}
+    try{localStorage.setItem('inv_code',c)}catch(e){}
+    gate='ok';await checkRestore();render();if(S.movs.length||S.ventas.length)schedBk()
+  }catch(e){m.style.color='var(--r)';m.textContent='Sin conexión o URL del script incorrecta.';CODE=''}}
+async function checkRestore(){
+  if(S.movs.length||S.ventas.length)return;
+  try{var r=await api({action:'load'});if(r.ok&&((r.movs||[]).length||(r.ventas||[]).length))BK=r}catch(e){}}
+function restore(){S.movs=BK.movs||[];S.ventas=BK.ventas||[];BK=null;save();render()}
+async function init(){
+  try{DEV=localStorage.getItem('inv_dev');if(!DEV){DEV='D'+Math.random().toString(36).slice(2,8).toUpperCase();localStorage.setItem('inv_dev',DEV)}}catch(e){DEV='D0'}
+  try{CODE=localStorage.getItem('inv_code')||''}catch(e){}
+  if(!CODE){gate='no';render();return}
+  gate='ok';render();
+  try{var r=await api({action:'auth'});
+    if(!r.ok&&r.revoked){try{localStorage.removeItem('inv_code')}catch(e){}CODE='';gate='no';auth=false;render();return}
+    await checkRestore();render();if(pend||S.movs.length||S.ventas.length)schedBk()
+  }catch(e){}}
+function schedBk(){if(gate!=='ok'||!CODE)return;pend=true;clearTimeout(bt);bt=setTimeout(doSync,1500)}
+async function doSync(){
+  try{var r=await api({action:'sync',movs:S.movs,ventas:S.ventas});
+    if(!r.ok){if(r.revoked){try{localStorage.removeItem('inv_code')}catch(e){}CODE='';gate='no';auth=false;render()}throw 0}
+    pend=false;lastBk=nowt();setBk('☁ Respaldo '+lastBk)
+  }catch(e){setBk('⚠ Sin conexión: se respaldará al volver el internet')}}
+window.addEventListener('online',function(){if(pend)doSync()});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
+load();hd=vd=today();init();
+</script></body></html>
