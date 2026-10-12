@@ -81,15 +81,15 @@ function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){ret
 function render(){
   if(gate!=='ok')return gateView();
   if(!auth)return lockView();
-  if(role!=='admin'&&tab!=='pos'&&tab!=='tur'&&tab!=='ord')tab='pos';
+  if(role!=='admin'&&tab!=='pos'&&tab!=='ord'&&tab!=='prn')tab='pos';
   var t=function(id,l,cur,fn){return '<button class="'+(cur===id?'on':'')+'" onclick="'+fn+'(\''+id+'\')">'+l+'</button>'};
-  var out='<h1>🌮 El Imperio del Taco <button class="btn x" style="float:right" onclick="logout()">'+esc(uname)+' · Bloquear</button></h1><div class="mu" id="bk" onclick="doSync()" style="margin:-6px 0 8px;cursor:pointer">'+(lastBk?'☁ Sincronizado '+lastBk+' ↻':'')+'</div>'+(BK?'<div class="card">Hay datos respaldados en la nube. <button class="btn s" onclick="restore()">Restaurar datos</button></div>':'')+'<div class="tabs top">'+t('pos','🧾 Cobrar',tab,'setTab')+t('tur','🕐 Turno',tab,'setTab')+t('ord','📋 Historial de órdenes',tab,'setTab')+t('ven','💰 Venta del día',tab,'setTab')+t('inv','📦 Inventario',tab,'setTab')+(role==='admin'?t('set','⚙ Ajustes',tab,'setTab'):'')+'</div>';
-  if(role!=='admin')out=out.replace(/<button[^>]*setTab\('(ven|inv)'\)[^>]*>.*?<\/button>/g,'');
+  var out='<h1>🌮 El Imperio del Taco <button class="btn x" style="float:right" onclick="logout()">'+esc(uname)+' · Bloquear</button></h1><div class="mu" id="bk" onclick="doSync()" style="margin:-6px 0 8px;cursor:pointer">'+(lastBk?'☁ Sincronizado '+lastBk+' ↻':'')+'</div>'+(BK?'<div class="card">Hay datos respaldados en la nube. <button class="btn s" onclick="restore()">Restaurar datos</button></div>':'')+'<div class="tabs top">'+t('pos','🧾 Cobrar',tab,'setTab')+t('tur','🕐 Turno',tab,'setTab')+t('ord','📋 Historial de órdenes',tab,'setTab')+t('prn','🖨 Impresora',tab,'setTab')+t('ven','💰 Venta del día',tab,'setTab')+t('inv','📦 Inventario',tab,'setTab')+(role==='admin'?t('set','⚙ Ajustes',tab,'setTab'):'')+'</div>';
+  if(role!=='admin')out=out.replace(/<button[^>]*setTab\('(ven|inv|tur)'\)[^>]*>.*?<\/button>/g,'');
   if(tab==='inv'){
     out+='<div class="tabs">'+t('reg','1 Registro',sub,'setSub')+t('his','2 Historial',sub,'setSub')+t('mov','3 Movimientos',sub,'setSub')+t('stk','4 Stock',sub,'setSub')+'</div>'+({reg:vReg,his:vHis,mov:vMov,stk:vStk}[sub])();
-  }else if(tab==='ord')out+=vOrd();else if(tab==='set')out+=vSet();else if(tab==='pos')out+=vPos();else if(tab==='tur')out+=vTur();else out+=vVen();
+  }else if(tab==='ord')out+=vOrd();else if(tab==='prn')out+=vPrn();else if(tab==='set')out+=vSet();else if(tab==='pos')out+=vPos();else if(tab==='tur')out+=vTur();else out+=vVen();
   $('app').innerHTML=out}
-function setTab(x){tab=x;render();if(x==='tur'||x==='ord'||x==='pos')doSync()}
+function setTab(x){tab=x;cf='';render();if(x==='tur'||x==='ord'||x==='pos')doSync()}
 function setSub(x){sub=x;render()}
 function dlist(){return '<datalist id="dl">'+names().map(function(x){return '<option value="'+esc(x)+'">'}).join('')+'</datalist>'}
 
@@ -218,8 +218,8 @@ window.addEventListener('online',function(){if(pend)doSync()});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(function(){});
 
 /* ====== COBRAR / TURNO / RESUMEN ====== */
-var role='',uname='',cart=[],ed=false,pay=null,payM='efectivo',recv='',rc=null,vt=null,vpp='day',uidc=0;
-function norm(){S.users=S.users||[];S.prods=S.prods||[];S.turnos=S.turnos||[];S.cfg=S.cfg||{w:80,msg:'¡Gracias por su compra!'};S.nTk=S.nTk||0;S.prods.forEach(function(p){if(!p.id)p.id=nid()});S.users.forEach(function(u){if(!u.id)u.id=nid()})}
+var curTk=null,pcat=null,role='',uname='',cart=[],ed=false,pay=null,payM='efectivo',recv='',rc=null,vt=null,vpp='day',uidc=0;
+function norm(){S.tickets=S.tickets||[];S.users=S.users||[];S.prods=S.prods||[];S.turnos=S.turnos||[];S.cfg=S.cfg||{w:80,msg:'¡Gracias por su compra!'};S.nTk=S.nTk||0;S.prods.forEach(function(p){if(!p.id)p.id=nid()});S.users.forEach(function(u){if(!u.id)u.id=nid()})}
 function curT(){for(var i=0;i<S.turnos.length;i++)if(!S.turnos[i].ci)return S.turnos[i];return null}
 function nid(){var t=Math.max(Date.now(),(nid.last||0)+1);nid.last=t;return t*100+((DIDX||0)%100)}
 function money(v){return '$'+n(v).toFixed(2)}
@@ -231,36 +231,65 @@ function itemTable(l){var b=byItem(l);if(!b.length)return '<p class="mu">Sin ven
 /* --- Cobrar --- */
 function vPos(){
   var T=curT();
-  if(!T)return '<div class="card"><b>El turno está cerrado</b><p class="mu">Abre el turno con el efectivo inicial para empezar a cobrar.</p><button class="btn" onclick="setTab(\'tur\')">Ir a Turno</button></div>';
-  if(pay)return vPay();
+  if(!T)return '<div class="card"><b>El turno está cerrado</b><p class="mu">'+(role==='admin'?'Abre el turno con el efectivo inicial para empezar a cobrar.</p><button class="btn" onclick="setTab(\'tur\')">Ir a Turno</button>':'Pide al administrador que abra el turno para poder cobrar.</p>')+'</div>';
+  if(pay&&ctk())return vPay();
+  pay=null;
   if(rc)return vDone();
-  var g=S.prods.length?S.prods.map(function(p,i){return '<button class="pb" onclick="addC('+i+')"><b>'+esc(p.n)+'</b><br>'+money(p.pr)+'</button>'}).join(''):'<p class="mu">Aún no hay productos. El administrador debe agregarlos en ⚙ Ajustes. Si ya los agregó, toca la línea ☁ de arriba para sincronizar.</p>';
-  var ch=cart.length?cart.map(function(l,i){return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+esc(l.n)+'<br><span class="mu">'+money(l.pr)+'</span></div><div class="q" style="flex:none"><button onclick="qC('+i+',-1)">−</button><b>'+l.c+'</b><button onclick="qC('+i+',1)">＋</button></div><div style="text-align:right;flex:none;min-width:70px"><b>'+money(l.c*l.pr)+'</b></div></div>'}).join(''):'<p class="mu">Toca un producto para agregarlo.</p>';
-  var t=cartTot();
-  return '<div class="pos"><div class="card"><div class="pg">'+g+'</div></div><div class="card"><b>Cuenta actual</b>'+otypeHtml()+ch+'<div class="tot"><span>Total</span><b>'+money(t)+'</b></div><button class="btn s" onclick="goPay()"'+(t>0?'':' disabled')+'>Cobrar '+money(t)+'</button><button class="btn o" onclick="cart=[];render()">Vaciar</button></div></div>'}
-function addC(i){var p=S.prods[i],x=cart.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else cart.push({n:p.n,pr:p.pr,c:1});render()}
-function qC(i,d){cart[i].c+=d;if(cart[i].c<=0)cart.splice(i,1);render()}
-function goPay(){if(otype==='domicilio'&&!oref.trim()){$('om').textContent='Escribe la dirección y teléfono para el domicilio';return}pay={tot:cartTot()};payM='efectivo';recv='';render()}
+  curTk=ctk();
+  if(!curTk){pcat=null;return vTickets()}
+  return vTicket()}
+/* --- Tickets abiertos (compartidos entre tablets) --- */
+function ctk(){if(!curTk)return null;return S.tickets.filter(function(x){return x.id===curTk.id})[0]||null}
+function catOf(p){return (p.cat||'').trim()||'Otros'}
+function cats(){var m={},o=[];S.prods.forEach(function(p){var c=catOf(p);if(!m[c]){m[c]={n:c,k:0};o.push(m[c])}m[c].k++});return o}
+function catList(){return '<datalist id="dcat">'+cats().map(function(c){return '<option value="'+esc(c.n)+'">'}).join('')+'</datalist>'}
+function setCat(i,v){S.prods[i].cat=(v||'').trim();save();render()}
+function tkTot(t){return n(t.items.reduce(function(a,l){return a+l.c*l.pr},0))}
+function vTickets(){
+  var l=S.tickets.slice().sort(function(a,b){return b.tk-a.tk});
+  return '<div class="card"><button class="btn s" style="margin:0" id="nbtn" onclick="newTk()">＋ Nuevo ticket</button></div>'+
+  '<div class="card"><b>Tickets abiertos ('+l.length+')</b>'+(l.length?l.map(function(t){
+    var q=t.items.reduce(function(a,x){return a+x.c},0);
+    return '<div style="padding:12px 0;border-bottom:1px solid var(--bd);cursor:pointer" onclick="openTk('+t.id+')"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+t.tk+' · '+tl(t.tipo)+(t.ref?' · '+esc(t.ref):'')+'</b><b>'+money(tkTot(t))+'</b></div><div class="mu">'+esc(t.mesero||'')+' · abierto '+t.t+' · '+q+' productos</div></div>'}).join(''):'<p class="mu">No hay tickets abiertos. Toca “Nuevo ticket” para empezar.</p>')+'</div>'}
+async function newTk(){
+  var b=$('nbtn');if(b){b.disabled=true;b.textContent='Creando…'}
+  var tk=await getTk();
+  var t={id:nid(),tk:tk,f:today(),t:nowt(),tipo:'aqui',ref:'',nota:'',mesero:uname,items:[]};
+  S.tickets.push(t);curTk=t;pcat=null;save();render()}
+function openTk(id){curTk=S.tickets.filter(function(x){return x.id===id})[0]||null;pcat=null;render()}
+function selCat(i){var c=cats()[i];pcat=c?c.n:null;render()}
+function vTicket(){
+  var t=curTk,tot=tkTot(t),left='';
+  if(!S.prods.length)left='<p class="mu">Aún no hay productos. El administrador debe agregarlos en ⚙ Ajustes. Si ya los agregó, toca la línea ☁ de arriba para sincronizar.</p>';
+  else if(pcat===null)left='<b>Categorías</b><div class="pg" style="margin-top:8px">'+cats().map(function(c,i){return '<button class="pb" onclick="selCat('+i+')"><b>'+esc(c.n)+'</b><br><span class="mu">'+c.k+' productos</span></button>'}).join('')+'</div>';
+  else left='<button class="btn o" style="margin:0 0 10px" onclick="pcat=null;render()">← Categorías</button><b>'+esc(pcat)+'</b><div class="pg" style="margin-top:8px">'+S.prods.map(function(p,i){return catOf(p)===pcat?'<button class="pb" onclick="addC('+i+')"><b>'+esc(p.n)+'</b><br>'+money(p.pr)+'</button>':''}).join('')+'</div>';
+  var ch=t.items.length?t.items.map(function(l,i){return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+esc(l.n)+'<br><span class="mu">'+money(l.pr)+'</span></div><div class="q" style="flex:none"><button onclick="qC('+i+',-1)">−</button><b>'+l.c+'</b><button onclick="qC('+i+',1)">＋</button></div><div style="text-align:right;flex:none;min-width:70px"><b>'+money(l.c*l.pr)+'</b></div></div>'}).join(''):'<p class="mu">Elige una categoría y toca un producto para agregarlo.</p>';
+  return '<div class="pos"><div class="card">'+left+'</div><div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>Ticket #'+t.tk+'</b><span class="mu">'+esc(t.mesero||'')+' · '+t.t+'</span></div>'+otypeHtml()+ch+'<div class="tot"><span>Total</span><b>'+money(tot)+'</b></div>'+
+  '<button class="btn s" onclick="goPay()"'+(tot>0?'':' disabled')+'>Cerrar ticket y cobrar '+money(tot)+'</button>'+
+  '<button class="btn" onclick="printCmd(ctk())"'+(tot>0?'':' disabled')+'>🖨 Comanda a cocina</button>'+
+  '<button class="btn o" onclick="leaveTk()">Guardar y dejar abierto</button>'+
+  '<button class="btn o" onclick="cancelTk()">Cancelar ticket</button></div></div>'}
+function addC(i){var t=ctk(),p=S.prods[i];if(!t||!p)return;var x=t.items.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else t.items.push({n:p.n,pr:p.pr,c:1});save();render()}
+function qC(i,d){var t=ctk();if(!t||!t.items[i])return;t.items[i].c+=d;if(t.items[i].c<=0)t.items.splice(i,1);save();render()}
+function setRef(v){var t=ctk();if(t){t.ref=v;save()}}
+function setNota(v){var t=ctk();if(t){t.nota=v;save()}}
+function setTipo(x){var t=ctk();if(t){t.tipo=x;save();render()}}
+function leaveTk(){var t=ctk();if(t&&!t.items.length)S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;save();render();doSync()}
+function cancelTk(){var t=ctk();if(!t)return;if(!confirm('¿Cancelar el ticket #'+t.tk+'? Se borra sin cobrar.'))return;S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;save();render();doSync()}
+function goPay(){var t=ctk();if(!t||!t.items.length)return;if(t.tipo==='domicilio'&&!(t.ref||'').trim()){$('om').textContent='Escribe la dirección y teléfono para el domicilio';return}pay={tot:tkTot(t)};payM='efectivo';recv='';render()}
 function vPay(){
   var t=pay.tot;
   return '<div class="card"><b>Cobrar</b><div class="tot"><span>Total</span><b>'+money(t)+'</b></div><div class="tabs"><button class="'+(payM==='efectivo'?'on':'')+'" onclick="payM=\'efectivo\';render()">💵 Efectivo</button><button class="'+(payM==='tarjeta'?'on':'')+'" onclick="payM=\'tarjeta\';render()">💳 Tarjeta</button></div>'+
   (payM==='efectivo'?'<label>Efectivo recibido (vacío = exacto)</label><input id="rv" type="number" inputmode="decimal" value="'+esc(recv)+'" oninput="recv=this.value;chg()" placeholder="'+t+'"><div class="tot"><span>Cambio</span><b id="cg">'+money(Math.max(0,(parseFloat(recv)||t)-t))+'</b></div>':'')+
   '<button class="btn s" id="pbtn" onclick="doPay()">Confirmar cobro</button><button class="btn o" onclick="pay=null;render()">← Volver</button><div class="msg" id="pm"></div></div>'}
 function chg(){var t=pay.tot,r=parseFloat(recv);$('cg').textContent=money(Math.max(0,(isNaN(r)?t:r)-t))}
-function doPay(){
-  var t=pay.tot,r=payM==='efectivo'?(parseFloat(recv)||t):t;
-  if(r<t){$('pm').textContent='El efectivo recibido es menor al total';return}
-  var T=curT(),f=today(),hh=nowt();S.nTk++;
-  cart.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:S.nTk,pago:payM,turno:T.id,tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim()})});
-  rc={tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim(),tk:S.nTk,f:f,t:hh,items:cart.map(function(l){return {n:l.n,c:l.c,pr:l.pr}}),tot:t,pago:payM,recv:r,cambio:n(r-t)};
-  cart=[];pay=null;oref='';onota='';save();render();doSync()}
-function vDone(){return '<div class="card" style="text-align:center"><h1>✓ Venta #'+rc.tk+' cobrada</h1><div class="tot"><span>Total</span><b>'+money(rc.tot)+'</b></div>'+(rc.pago==='efectivo'?'<div class="tot"><span>Cambio</span><b>'+money(rc.cambio)+'</b></div>':'')+'<button class="btn" onclick="prn(cmdHtml(rc))">🖨 Imprimir comanda</button><button class="btn s" onclick="rc=null;render()">Nueva venta</button></div>'}
+function vDone(){return '<div class="card" style="text-align:center"><h1>✓ Venta #'+rc.tk+' cobrada</h1><div class="tot"><span>Total</span><b>'+money(rc.tot)+'</b></div>'+(rc.pago==='efectivo'?'<div class="tot"><span>Cambio</span><b>'+money(rc.cambio)+'</b></div>':'')+'<button class="btn" onclick="printCmd(rc)">🖨 Imprimir comanda</button><button class="btn s" onclick="rc=null;render()">Nueva venta</button></div>'}
 function vMenu(){
-  return '<div class="card"><b>Menú</b>'+S.prods.map(function(p,i){return '<div class="row" style="align-items:center;padding:4px 0"><div>'+esc(p.n)+' · '+money(p.pr)+'</div><div style="flex:none"><button class="btn x" onclick="delP('+i+')">✕</button></div></div>'}).join('')+
-  '<div class="row"><input id="pn" placeholder="Producto"><input id="pp" type="number" inputmode="decimal" placeholder="Precio"></div><button class="btn s" onclick="addP()">Agregar al menú</button><div class="msg" id="pmm"></div>'+
+  return '<div class="card"><b>Menú</b>'+catList()+S.prods.map(function(p,i){return '<div class="row" style="align-items:center;padding:4px 0"><div>'+esc(p.n)+' · '+money(p.pr)+'</div><div><input list="dcat" value="'+esc(p.cat||'')+'" placeholder="Categoría" onchange="setCat('+i+',this.value)"></div><div style="flex:none"><button class="btn x" onclick="delP('+i+')">✕</button></div></div>'}).join('')+
+  '<div class="row"><input id="pn" placeholder="Producto"><input id="pp" type="number" inputmode="decimal" placeholder="Precio"></div><input id="pc" list="dcat" placeholder="Categoría (ej: Tacos)" style="margin-top:6px"><button class="btn s" onclick="addP()">Agregar al menú</button><div class="msg" id="pmm"></div>'+
   '<label>Ancho del papel de la comanda</label><select onchange="S.cfg.w=+this.value;save()"><option value="80"'+(S.cfg.w!=58?' selected':'')+'>80 mm</option><option value="58"'+(S.cfg.w==58?' selected':'')+'>58 mm</option></select>'+
   '</div>'}
-function addP(){var nm=$('pn').value.trim(),p=parseFloat($('pp').value);if(!nm||!(p>=0)){$('pmm').textContent='Escribe nombre y precio';return}S.prods.push({id:nid(),n:nm,pr:p});save();render()}
+function addP(){var nm=$('pn').value.trim(),p=parseFloat($('pp').value);if(!nm||!(p>=0)){$('pmm').textContent='Escribe nombre y precio';return}S.prods.push({id:nid(),n:nm,pr:p,cat:($('pc').value||'').trim()});save();render()}
 function delP(i){S.prods.splice(i,1);save();render()}
 
 /* --- Imprimir --- */
@@ -268,6 +297,66 @@ function prn(html){var r=$('rcpt');r.innerHTML=html;r.style.width=(S.cfg.w==58?'
 function fx(a,b,bold){return '<div style="display:flex;justify-content:space-between;gap:6px'+(bold?';font-weight:bold':'')+'"><span>'+a+'</span><span>'+b+'</span></div>'}
 function resRows(T){var s=tStats(T),c=T.ci;return [['Cajero',T.u||'—'],['Apertura',T.ab.f+' '+T.ab.t],['Efectivo inicial',money(T.fondo)],['Ventas en efectivo',money(s.ef)],['Ventas con tarjeta',money(s.tj)],['Total de ventas',money(s.tot)],['Tickets',s.nt],['Ingresos de caja',money(s.ing)],['Retiros de caja',money(s.ret)],['Efectivo esperado',money(s.esp)]].concat(c?[['Cierre',c.f+' '+c.t],['Efectivo contado',money(c.contado)],['Diferencia',money(c.dif)]]:[])}
 function resHtml(T){var b=byItem(tStats(T).vs);return '<div style="text-align:center"><b style="font-size:15px">El Imperio del Taco</b><br>Resumen de turno</div><hr>'+resRows(T).map(function(r){return fx(r[0],r[1])}).join('')+'<hr><b>Venta por artículo</b>'+b.map(function(o){return fx(o.c+' x '+esc(o.p),money(o.t))}).join('')+'<br>'}
+
+/* --- Impresión: RawBT (Android) / Bluetooth directo / diálogo del navegador. Se guarda por equipo. --- */
+var PM='';try{PM=localStorage.getItem('inv_prn')||''}catch(e){}
+if(!PM)PM=/Android/i.test(navigator.userAgent)?'rawbt':'nav';
+function setPM(v){PM=v;try{localStorage.setItem('inv_prn',v)}catch(e){}render()}
+function colsW(){return S.cfg.w==58?32:48}
+var MAPC={'á':0xA0,'é':0x82,'í':0xA1,'ó':0xA2,'ú':0xA3,'ñ':0xA4,'Ñ':0xA5,'¿':0xA8,'¡':0xAD,'ü':0x81,'É':0x90};
+function ebytes(s){var o=[];String(s).split('').forEach(function(ch){var c=ch.charCodeAt(0);if(MAPC[ch]!==undefined)o.push(MAPC[ch]);else if(c<128)o.push(c);else{var d=ch.normalize('NFD').charCodeAt(0);o.push(d<128?d:63)}});return o}
+function EP(){var b=[0x1B,0x40,0x1B,0x74,0x00],o={
+  t:function(s){ebytes(s).forEach(function(x){b.push(x)});return o},
+  nl:function(k){for(var i=0;i<(k||1);i++)b.push(10);return o},
+  al:function(a){b.push(0x1B,0x61,a);return o},
+  sz:function(w,hh){b.push(0x1D,0x21,((w-1)<<4)|(hh-1));return o},
+  bd:function(on){b.push(0x1B,0x45,on?1:0);return o},
+  cut:function(){o.nl(4);b.push(0x1D,0x56,0x42,0x00);return o},
+  b:b};return o}
+function lnW(){return new Array(colsW()+1).join('-')}
+function lr(a,c){var sp=colsW()-a.length-c.length;return a+(sp>0?new Array(sp+1).join(' '):' ')+c}
+function cmdBytes(o){
+  var e=EP(),ln=lnW();
+  e.al(1).sz(2,2).bd(1).t('COMANDA #'+o.tk).nl().sz(1,2).t(tl(o.tipo).toUpperCase()).nl().sz(1,1).bd(0);
+  if(o.ref)e.t(o.ref).nl();
+  e.t(o.f+' '+o.t+(o.mesero?' '+o.mesero:'')).nl().al(0).t(ln).nl();
+  o.items.forEach(function(i){e.sz(1,2).bd(1).t(i.c+' x '+i.n).nl()});
+  e.sz(1,1).bd(0);
+  if(o.nota)e.t(ln).nl().bd(1).t('NOTA: ').bd(0).t(o.nota).nl();
+  e.t(ln).cut();return e.b}
+function resBytes(T){
+  var e=EP(),ln=lnW();
+  e.al(1).bd(1).t('El Imperio del Taco').nl().bd(0).t('Resumen de turno').nl().al(0).t(ln).nl();
+  resRows(T).forEach(function(r){e.t(lr(String(r[0]),String(r[1]))).nl()});
+  e.t(ln).nl().bd(1).t('Venta por articulo').nl().bd(0);
+  byItem(tStats(T).vs).forEach(function(o){e.t(lr(o.c+' x '+o.p,money(o.t))).nl()});
+  e.cut();return e.b}
+function testBytes(){var e=EP();e.al(1).sz(2,2).bd(1).t('El Imperio').nl().t('del Taco').nl().sz(1,1).bd(0).nl().t('Prueba de impresion OK').nl().t('Acentos: á é í ó ú ñ ¿ ¡').nl().al(0).t(lnW()).cut();return e.b}
+function printCmd(o){if(!o)return;if(PM==='nav')prn(cmdHtml(o));else sendBytes(cmdBytes(o))}
+function printRes(T){if(!T)return;if(PM==='nav')prn(resHtml(T));else sendBytes(resBytes(T))}
+function printTest(){if(PM==='nav')prn('<div style="text-align:center"><b>El Imperio del Taco</b><br>Prueba de impresión</div><br>');else sendBytes(testBytes())}
+function sendBytes(by){if(PM==='rawbt')rawbt(by);else if(PM==='bt')btPrint(by)}
+function b64(by){var s='';by.forEach(function(x){s+=String.fromCharCode(x)});return btoa(s)}
+function rawbt(by){window.location.href='intent:base64,'+b64(by)+'#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;'}
+var BTc=null;
+async function btPrint(by){
+  try{
+    if(!navigator.bluetooth){alert('Este navegador no permite Bluetooth directo. Usa el modo RawBT.');return}
+    if(!BTc){
+      var d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:['000018f0-0000-1000-8000-00805f9b34fb','49535343-fe7d-4ae5-8fa9-9fafd205e455','e7810a71-73ae-499d-8c15-faa9aef0c3f2','0000ffe0-0000-1000-8000-00805f9b34fb','0000ff00-0000-1000-8000-00805f9b34fb']});
+      var sv=await d.gatt.connect(),ss=await sv.getPrimaryServices();
+      for(var i=0;i<ss.length&&!BTc;i++){var cs=await ss[i].getCharacteristics();for(var j=0;j<cs.length;j++){if(cs[j].properties.write||cs[j].properties.writeWithoutResponse){BTc=cs[j];break}}}
+      if(!BTc){alert('No encontré cómo escribir en esa impresora (casi seguro es Bluetooth clásico). Usa el modo RawBT.');return}
+      d.addEventListener('gattserverdisconnected',function(){BTc=null})
+    }
+    for(var k=0;k<by.length;k+=100){var ch=new Uint8Array(by.slice(k,k+100));if(BTc.properties.writeWithoutResponse)await BTc.writeValueWithoutResponse(ch);else await BTc.writeValue(ch);await new Promise(function(r){setTimeout(r,30)})}
+  }catch(e){BTc=null;alert('No se pudo imprimir: '+((e&&e.message)||e))}}
+function vPrn(){
+  var op=function(v,l){return '<option value="'+v+'"'+(PM===v?' selected':'')+'>'+l+'</option>'};
+  return '<div class="card"><b>🖨 Impresora de este equipo</b><p class="mu">Cada tablet guarda su propia configuración. Papel actual: '+(S.cfg.w==58?'58 mm (PT-210)':'80 mm — para la PT-210 el administrador debe cambiarlo a 58 mm en Ajustes')+'.</p>'+
+  '<label>Modo de impresión</label><select onchange="setPM(this.value)">'+op('rawbt','Android con app RawBT (recomendado para la PT-210)')+op('bt','Bluetooth directo (solo impresoras BLE)')+op('nav','Diálogo del navegador')+'</select>'+
+  '<button class="btn s" onclick="printTest()">🖨 Imprimir prueba</button></div>'+
+  '<div class="card"><b>Cómo vincular la PT-210 con RawBT</b><p class="mu">1) Instala la app <b>RawBT</b> desde Play Store.<br>2) Enciende la PT-210 y vincúlala en Ajustes → Bluetooth de la tablet (PIN 0000 o 1234).<br>3) Abre RawBT → Ajustes → Impresora → Bluetooth → elige la PT-210 y deja el modo ESC/POS genérico.<br>4) Vuelve aquí, deja el modo RawBT y toca “Imprimir prueba”.</p></div>'}
 
 /* --- Turno --- */
 function tStats(T){
@@ -277,7 +366,7 @@ function tStats(T){
   return {tot:n(tot),ef:n(ef),tj:n(tj),nt:Object.keys(tk).length,ing:n(ing),ret:n(ret),esp:n(T.fondo+ef+ing-ret),vs:vs}}
 async function openT(){var f=parseFloat($('fd').value);if(isNaN(f)||f<0){$('tm').textContent='Escribe el efectivo inicial';return}$('tm').textContent='Revisando si ya hay un turno abierto…';await doSync();if(curT()){render();return}S.turnos.push({u:uname,id:nid(),ab:{f:today(),t:nowt()},fondo:n(f),cj:[],ci:null});save();render();doSync()}
 function cajaMov(tipo){var m=parseFloat($('cm').value);if(!(m>0)){$('cmm').textContent='Escribe un monto';return}curT().cj.push({tipo:tipo,monto:n(m),nt:$('cn').value.trim(),t:nowt()});save();render()}
-function closeT(){var T=curT(),c=parseFloat($('cc').value);if(isNaN(c)){$('tm').textContent='Escribe el efectivo contado';return}var s=tStats(T);T.ci={f:today(),t:nowt(),contado:n(c),dif:n(c-s.esp)};cart=[];pay=null;rc=null;vt=T.id;save();render();doSync()}
+function closeT(){var T=curT(),c=parseFloat($('cc').value);if(isNaN(c)){$('tm').textContent='Escribe el efectivo contado';return}if(S.tickets.length){$('tm').textContent='Hay '+S.tickets.length+' ticket(s) abierto(s). Cóbralos o cancélalos antes de cerrar el turno';return}var s=tStats(T);T.ci={f:today(),t:nowt(),contado:n(c),dif:n(c-s.esp)};cart=[];curTk=null;pay=null;rc=null;vt=T.id;save();render();doSync()}
 function vTur(){
   var T=curT(),o='',nOp=S.turnos.filter(function(x){return !x.ci}).length;if(nOp>1)o+='<div class="card" style="border-color:var(--y)"><b>Hay '+nOp+' turnos abiertos</b><p class="mu">Se abrieron al mismo tiempo en las dos tablets. Cierra primero este turno y luego el siguiente.</p></div>';
   if(!T)o+='<div class="card"><b>Abrir turno</b><label>Efectivo inicial en caja ($)</label><input id="fd" type="number" inputmode="decimal" placeholder="0.00"><button class="btn s" onclick="openT()">Abrir turno</button><div class="msg" id="tm"></div></div>';
@@ -285,10 +374,11 @@ function vTur(){
     o+='<div class="card"><b>Turno abierto</b><p class="mu">Desde '+T.ab.f+' '+T.ab.t+' · Fondo '+money(T.fondo)+'</p><div class="sum"><div><b>'+money(s.tot)+'</b>ventas</div><div><b>'+money(s.ef)+'</b>efectivo</div><div><b>'+money(s.tj)+'</b>tarjeta</div></div><div class="sum"><div><b>'+s.nt+'</b>tickets</div><div><b>'+money(s.esp)+'</b>efectivo esperado</div></div></div>'+
     '<div class="card"><b>Ingreso / retiro de caja</b><div class="row"><input id="cm" type="number" inputmode="decimal" placeholder="Monto"><input id="cn" placeholder="Motivo"></div><div class="row"><button class="btn s" onclick="cajaMov(\'ingreso\')">＋ Ingreso</button><button class="btn" onclick="cajaMov(\'retiro\')">－ Retiro</button></div>'+T.cj.map(function(m){return '<div class="mu" style="padding-top:6px">'+m.t+' · '+(m.tipo==='ingreso'?'Ingreso':'Retiro')+' '+money(m.monto)+(m.nt?' · '+esc(m.nt):'')+'</div>'}).join('')+'<div class="msg" id="cmm"></div></div>'+
     '<div class="card"><b>Cerrar turno</b><label>Efectivo contado en caja ($)</label><input id="cc" type="number" inputmode="decimal" oninput="$(\'df\').textContent=money((parseFloat(this.value)||0)-'+s.esp+')"><div class="tot"><span>Diferencia</span><b id="df">$0.00</b></div><button class="btn" onclick="closeT()">Cerrar turno</button><div class="msg" id="tm"></div></div>'}
+  if(T&&role==='admin')o+='<div class="card"><button class="btn o" style="margin:0" onclick="ask(\'t'+T.id+'\')">'+(cf==='t'+T.id?'⚠ ¿Seguro? Se borra el turno y sus ventas':'🗑 Borrar este turno (prueba)')+'</button></div>';
   var V=S.turnos.filter(function(x){return x.id===vt})[0];
-  if(V)o+='<div class="card"><b>Resumen del turno</b>'+resRows(V).map(function(r){return '<div class="tot" style="font-size:16px;padding:4px 0"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>'}).join('')+'<b>Venta por artículo</b>'+itemTable(tStats(V).vs)+'<button class="btn" onclick="prn(resHtml(S.turnos.filter(function(x){return x.id===vt})[0]))">🖨 Imprimir resumen</button></div>';
+  if(V)o+='<div class="card"><b>Resumen del turno</b>'+resRows(V).map(function(r){return '<div class="tot" style="font-size:16px;padding:4px 0"><span>'+r[0]+'</span><b>'+r[1]+'</b></div>'}).join('')+'<b>Venta por artículo</b>'+itemTable(tStats(V).vs)+'<button class="btn" onclick="printRes(S.turnos.filter(function(x){return x.id===vt})[0])">🖨 Imprimir resumen</button></div>';
   var h=S.turnos.filter(function(x){return x.ci}).slice(-20).reverse();
-  if(role==='admin')o+='<div class="card"><b>Turnos anteriores</b>'+(h.length?h.map(function(x){var q=tStats(x);return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+x.ab.f+' '+x.ab.t+'<br><span class="mu">'+money(q.tot)+' · dif. '+money(x.ci.dif)+'</span></div><div style="flex:none"><button class="btn x" onclick="vt='+x.id+';render()">Ver</button></div></div>'}).join(''):'<p class="mu">Aún no hay turnos cerrados.</p>')+'</div>';
+  if(role==='admin')o+='<div class="card"><b>Turnos anteriores</b>'+(h.length?h.map(function(x){var q=tStats(x);return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+x.ab.f+' '+x.ab.t+'<br><span class="mu">'+money(q.tot)+' · dif. '+money(x.ci.dif)+'</span></div><div style="flex:none"><button class="btn x" onclick="vt='+x.id+';render()">Ver</button> <button class="btn x" onclick="ask(\'t'+x.id+'\')">'+(cf==='t'+x.id?'¿Seguro?':'🗑')+'</button></div></div>'}).join(''):'<p class="mu">Aún no hay turnos cerrados.</p>')+'</div>';
   return o}
 
 /* --- Resumen en Venta del día --- */
@@ -322,9 +412,9 @@ function enter(){
   else{var u=S.users.filter(function(x){return x.pin===hp})[0];if(!u){$('lm').textContent='PIN incorrecto';return}role='cajero';uname=u.n}
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab='pos';save();render()}
-function vSet(){return vMenu()+vUsers()}
+function vSet(){return vMenu()+vUsers()+vClean()}
 function vUsers(){
-  return '<div class="card"><b>Meseros</b><p class="mu">Los meseros ven <b>Cobrar</b>, <b>Turno</b> e <b>Historial de órdenes</b>. El administrador ve todo.</p>'+
+  return '<div class="card"><b>Meseros</b><p class="mu">Los meseros ven <b>Cobrar</b>, <b>Historial de órdenes</b> e <b>Impresora</b>. El administrador ve todo (incluido el Turno, que es quien lo abre y lo cierra).</p>'+
   S.users.map(function(u,i){return '<div class="row" style="align-items:center;padding:4px 0"><div>'+esc(u.n)+'</div><div style="flex:none"><button class="btn x" onclick="delU('+i+')">Quitar</button></div></div>'}).join('')+
   '<div class="row"><input id="un" placeholder="Nombre del mesero"><input id="up" type="password" inputmode="numeric" placeholder="PIN (mín. 4)"></div><button class="btn s" onclick="addU()">Agregar mesero</button><div class="msg" id="um"></div>'+
   '<label>Cambiar PIN de administrador</label><input id="ap" type="password" inputmode="numeric" placeholder="Nuevo PIN"><button class="btn o" onclick="chPin()">Guardar PIN</button><div class="msg" id="um2"></div></div>'}
@@ -343,8 +433,8 @@ function chPin(){
 var otype='aqui',oref='',onota='',od='',opp='day',oq='',OL=[];
 function tl(t){return {aqui:'Comer aquí',domicilio:'Domicilio',recoger:'Pasar a recoger'}[t]||'—'}
 function otypeHtml(){
-  var lab={aqui:'Mesa (opcional)',domicilio:'Dirección y teléfono (obligatorio)',recoger:'Nombre del cliente (opcional)'}[otype];
-  return '<div class="tabs" style="margin:8px 0">'+[['aqui','🍽 Comer aquí'],['domicilio','🛵 Domicilio'],['recoger','🛍 Pasar a recoger']].map(function(x){return '<button class="'+(otype===x[0]?'on':'')+'" onclick="otype=\''+x[0]+'\';render()">'+x[1]+'</button>'}).join('')+'</div><input placeholder="'+lab+'" value="'+esc(oref)+'" oninput="oref=this.value"><input style="margin-top:6px" placeholder="Notas para cocina (ej: sin cebolla)" value="'+esc(onota)+'" oninput="onota=this.value"><div class="msg" id="om"></div>'}
+  var t=curTk,lab={aqui:'Mesa (opcional)',domicilio:'Dirección y teléfono (obligatorio)',recoger:'Nombre del cliente (opcional)'}[t.tipo]||'';
+  return '<div class="tabs" style="margin:8px 0">'+[['aqui','🍽 Comer aquí'],['domicilio','🛵 Domicilio'],['recoger','🛍 Pasar a recoger']].map(function(x){return '<button class="'+(t.tipo===x[0]?'on':'')+'" onclick="setTipo(\''+x[0]+'\')">'+x[1]+'</button>'}).join('')+'</div><input placeholder="'+lab+'" value="'+esc(t.ref||'')+'" oninput="setRef(this.value)"><input style="margin-top:6px" placeholder="Notas para cocina (ej: sin cebolla)" value="'+esc(t.nota||'')+'" oninput="setNota(this.value)"><div class="msg" id="om"></div>'}
 function ordersOf(l){var m={};l.forEach(function(v){var o=m[v.tk]=m[v.tk]||{tk:v.tk,f:v.f,t:v.t,tipo:v.tipo,ref:v.ref,mesero:v.mesero,pago:v.pago,nota:v.nota,items:[],tot:0};o.items.push({n:v.p,c:v.c,pr:v.pr});o.tot+=v.c*v.pr});return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.tk-a.tk})}
 function cmdHtml(o){
   return '<div style="text-align:center;font-size:20px;font-weight:bold">COMANDA #'+o.tk+'</div><div style="text-align:center;font-size:17px;font-weight:bold">'+tl(o.tipo).toUpperCase()+'</div>'+(o.ref?'<div style="text-align:center;font-size:14px">'+esc(o.ref)+'</div>':'')+'<div style="text-align:center">'+o.f+' '+o.t+(o.mesero?' · '+esc(o.mesero):'')+'</div><hr>'+
@@ -359,14 +449,14 @@ function ordList(){
   if(!OL.length)return '<p class="mu">Sin órdenes.</p>';
   var tot=0;OL.forEach(function(o){tot+=o.tot});
   return '<div class="sum"><div><b>'+OL.length+'</b>órdenes</div><div><b>'+money(tot)+'</b>total</div></div>'+OL.map(function(o,i){
-    return '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+o.tk+' · '+tl(o.tipo)+'</b><b>'+money(o.tot)+'</b></div><div class="mu">'+o.f.slice(5)+' '+o.t+(o.ref?' · '+esc(o.ref):'')+(o.mesero?' · '+esc(o.mesero):'')+' · '+(o.pago==='tarjeta'?'Tarjeta':'Efectivo')+'</div><div>'+o.items.map(function(x){return x.c+' x '+esc(x.n)}).join(', ')+'</div>'+(o.nota?'<div class="mu">Nota: '+esc(o.nota)+'</div>':'')+'<button class="btn x" style="margin-top:6px" onclick="prn(cmdHtml(OL['+i+']))">🖨 Comanda</button></div>'}).join('')}
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+o.tk+' · '+tl(o.tipo)+'</b><b>'+money(o.tot)+'</b></div><div class="mu">'+o.f.slice(5)+' '+o.t+(o.ref?' · '+esc(o.ref):'')+(o.mesero?' · '+esc(o.mesero):'')+' · '+(o.pago==='tarjeta'?'Tarjeta':'Efectivo')+'</div><div>'+o.items.map(function(x){return x.c+' x '+esc(x.n)}).join(', ')+'</div>'+(o.nota?'<div class="mu">Nota: '+esc(o.nota)+'</div>':'')+'<button class="btn x" style="margin-top:6px" onclick="printCmd(OL['+i+'])">🖨 Comanda</button></div>'}).join('')}
 function vOrd(){
   if(!od)od=today();
   return '<div class="card"><div class="tabs">'+[['day','Día'],['week','Semana'],['month','Mes']].map(function(x){return '<button class="'+(opp===x[0]?'on':'')+'" onclick="opp=\''+x[0]+'\';render()">'+x[1]+'</button>'}).join('')+'</div><input type="date" value="'+od+'" onchange="od=this.value||today();render()"><input style="margin-top:8px" placeholder="Buscar: # de orden, mesa/cliente o mesero" value="'+esc(oq)+'" oninput="oq=this.value;$(\'ol\').innerHTML=ordList()"><div id="ol" style="margin-top:8px">'+ordList()+'</div></div>'}
 
 /* ====== SINCRONIZACIÓN ENTRE TABLETS ====== */
-var DIDX=0,IDX=0,KB='inv_base_v2',COLS=['ventas','movs','turnos','prods','users'],syncing=false,again=false,UI=false,paying=false;
-var BASE={sv:0,cv:0,nk:0,cfgh:'',h:{ventas:{},movs:{},turnos:{},prods:{},users:{}}};
+var DIDX=0,IDX=0,KB='inv_base_v2',COLS=['ventas','movs','turnos','prods','users','tickets'],syncing=false,again=false,UI=false,paying=false;
+var BASE={sv:0,cv:0,nk:0,cfgh:'',h:{ventas:{},movs:{},turnos:{},prods:{},users:{},tickets:{}}};
 function loadBase(){try{var r=localStorage.getItem(KB);if(r){var b=JSON.parse(r);if(b&&b.h){COLS.forEach(function(c){b.h[c]=b.h[c]||{}});BASE=b}}}catch(e){}}
 function saveBase(){try{localStorage.setItem(KB,JSON.stringify(BASE))}catch(e){}}
 function persist(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}}
@@ -403,8 +493,8 @@ function applyResp(r){
       delete bh[k]})});
   if(r.cfg){var c2=r.cfg,o={};for(var k in c2)if(k!=='pin'&&k!=='_v')o[k]=c2[k];
     if(c2.pin)S.pin=c2.pin;S.cfg=o;BASE.cv=c2._v;BASE.cfgh=h(JSON.stringify(cfgObj()));UI=true}
-  if(r.nTk){BASE.nk=r.nTk;if(r.nTk>(S.nTk||0))S.nTk=r.nTk}
-  ['turnos','prods','users'].forEach(function(c){S[c].sort(function(a,b){return a.id-b.id})})}
+  if(r.nTk!==undefined){BASE.nk=r.nTk;S.nTk=r.nTk}
+  ['turnos','prods','users','tickets'].forEach(function(c){S[c].sort(function(a,b){return a.id-b.id})})}
 var UIpend=false;
 function refresh(){if(!auth||gate!=='ok')return;var a=document.activeElement;if(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){UIpend=true;return}UIpend=false;render()}
 function syncMsg(e){var m=(e&&e.message)||'';
@@ -424,7 +514,7 @@ async function doSync(){
       var r=await api(req);
       if(!r.ok){if(r.revoked){lockOut();syncing=false;return}throw new Error(r.msg||'ERR')}
       if(r.ver===undefined)throw new Error('OLDSRV');
-      if(r.reset){BASE.h={ventas:{},movs:{},turnos:{},prods:{},users:{}};BASE.cv=0;BASE.cfgh='';BASE.sv=0;continue}
+      if(r.reset){BASE.h={ventas:{},movs:{},turnos:{},prods:{},users:{},tickets:{}};BASE.cv=0;BASE.cfgh='';BASE.sv=0;continue}
       COLS.forEach(function(c){var o=b.ops[c];if(!o)return;o.set.forEach(function(rec){BASE.h[c][String(rec.id)]=hr(rec)});o.del.forEach(function(id){delete BASE.h[c][String(id)]})});
       applyResp(r);BASE.sv=r.ver;saveBase();
       if(!b.more&&!r.more)break}
@@ -437,18 +527,16 @@ async function getTk(){
   try{var r=await Promise.race([api({action:'next'}),new Promise(function(_,rj){setTimeout(function(){rj(1)},5000)})]);
     if(r&&r.ok&&r.tk){if(r.tk>(S.nTk||0))S.nTk=r.tk;return r.tk}}catch(e){}
   S.off=(S.off||0)+1;return 100000*(IDX||9)+S.off}
-async function doPay(){
-  if(paying)return;
-  var t=pay.tot,r=payM==='efectivo'?(parseFloat(recv)||t):t;
-  if(r<t){$('pm').textContent='El efectivo recibido es menor al total';return}
-  paying=true;var bt=$('pbtn');if(bt){bt.disabled=true;bt.textContent='Cobrando…'}
-  var tk=await getTk(),T=curT(),f=today(),hh=nowt();
-  paying=false;
-  if(!T){render();return}
-  var items=cart.map(function(l){return {n:l.n,c:l.c,pr:l.pr}});
-  cart.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:tk,pago:payM,turno:T.id,tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim()})});
-  rc={tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim(),tk:tk,f:f,t:hh,items:items,tot:t,pago:payM,recv:r,cambio:n(r-t)};
-  cart=[];pay=null;oref='';onota='';save();render();doSync()}
+function doPay(){
+  var t=ctk();if(!t){pay=null;curTk=null;render();return}
+  var tot=tkTot(t),r=payM==='efectivo'?(parseFloat(recv)||tot):tot;
+  if(r<tot){$('pm').textContent='El efectivo recibido es menor al total';return}
+  var T=curT();if(!T){pay=null;render();return}
+  var f=today(),hh=nowt(),ref=(t.ref||'').trim(),nota=(t.nota||'').trim(),mes=t.mesero||uname;
+  t.items.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:t.tk,pago:payM,turno:T.id,tipo:t.tipo,ref:ref,mesero:mes,nota:nota})});
+  rc={tipo:t.tipo,ref:ref,mesero:mes,nota:nota,tk:t.tk,f:f,t:hh,items:t.items.map(function(l){return {n:l.n,c:l.c,pr:l.pr}}),tot:tot,pago:payM,recv:r,cambio:n(r-tot)};
+  S.tickets=S.tickets.filter(function(x){return x.id!==t.id});
+  curTk=null;pcat=null;pay=null;save();render();doSync()}
 async function activate(){
   var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),m=$('gm');
   if(!c){m.textContent='Escribe el código';return}
@@ -471,5 +559,15 @@ async function init(){
   if(!auth)render()}
 setInterval(function(){if(gate==='ok'&&CODE&&!document.hidden)doSync()},45000);
 if(document.addEventListener){document.addEventListener('visibilitychange',function(){if(!document.hidden&&gate==='ok'&&CODE)doSync()});document.addEventListener('focusout',function(){if(UIpend)setTimeout(refresh,400)})}
+
+/* --- Borrar datos de prueba (solo administrador) --- */
+var cf='';
+function ask(k){if(role!=='admin')return;if(cf===k){cf='';if(k==='sales')wipeSales();else if(k==='inv')wipeInv();else if(k.charAt(0)==='t')delTurno(Number(k.slice(1)))}else{cf=k;render()}}
+function vClean(){
+  function b(k,txt){var on=cf===k;return '<button class="btn '+(on?'':'o')+'"'+(on?' style="background:var(--r)"':'')+' onclick="ask(\''+k+'\')">'+(on?'⚠ ¿Seguro? Toca otra vez para borrar':txt)+'</button>'}
+  return '<div class="card"><b>🧹 Borrar datos de prueba</b><p class="mu">Se borran en todas las tablets y en tu hoja de Google, y no se puede deshacer. El menú, los meseros y el PIN no se tocan.</p>'+b('sales','Borrar ventas, órdenes y turnos (y reiniciar el # de orden)')+b('inv','Borrar movimientos de inventario')+'</div>'}
+function delTurno(id){S.turnos=S.turnos.filter(function(x){return x.id!==id});S.ventas=S.ventas.filter(function(v){return v.turno!==id});if(vt===id)vt=null;save();render();doSync()}
+async function wipeSales(){S.ventas=[];S.turnos=[];S.tickets=[];curTk=null;S.nTk=0;S.off=0;vt=null;cart=[];pay=null;rc=null;BASE.nk=0;save();render();try{await api({action:'resetnum'})}catch(e){}doSync()}
+function wipeInv(){S.movs=[];save();render();doSync()}
 load();norm();hd=vd=today();init();
 </script></body></html>
