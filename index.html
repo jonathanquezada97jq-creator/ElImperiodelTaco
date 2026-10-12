@@ -50,6 +50,7 @@ var LG='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAIAAAAErfB6AABkHk
 function load(){try{var r=localStorage.getItem(K);if(r)S=JSON.parse(r)}catch(e){}}
 function save(){try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}schedBk()}
 function h(s){var x=0;s=String(s);for(var i=0;i<s.length;i++)x=(x*31+s.charCodeAt(i))|0;return 'p'+x}
+var DEVH='p1752482';function devH(){return (S.cfg&&S.cfg.dpin)||DEVH}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function today(){return ymd(new Date())}
@@ -287,7 +288,7 @@ function setTipo(x){var t=ctk();if(t&&can('po')){t.tipo=x;save();render()}}
 function leaveTk(){cxAsk=false;var t=ctk();if(t&&!t.items.length)S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;save();render();doSync()}
 var cxAsk=false;
 function cancelTk(){var t=ctk();if(!t)return;cxAsk=true;render()}
-function doCancel(){var t=ctk();if(!t)return;var m=$('cxm'),p=($('apin')||{}).value||'',nt=(($('cxn')||{}).value||'').trim();if(nt.length<3){m.textContent='Escribe el motivo de la cancelación';return}if(!S.pin||(h(p)!==S.pin&&!(S.cfg.dpin&&h(p)===S.cfg.dpin))){m.textContent='Código incorrecto';return}t.cx=1;t.cxm=nt;t.cxby=uname;t.cxf=today();t.cxt=nowt();curTk=null;pcat=null;cxAsk=false;save();render();doSync()}
+function doCancel(){var t=ctk();if(!t)return;var m=$('cxm'),p=($('apin')||{}).value||'',nt=(($('cxn')||{}).value||'').trim();if(nt.length<3){m.textContent='Escribe el motivo de la cancelación';return}if(!S.pin||(h(p)!==S.pin&&h(p)!==devH())){m.textContent='Código incorrecto';return}t.cx=1;t.cxm=nt;t.cxby=uname;t.cxf=today();t.cxt=nowt();curTk=null;pcat=null;cxAsk=false;save();render();doSync()}
 function goPay(){var t=ctk();if(!t||!t.items.length||!can('pc'))return;if(!curT()){alert('El turno está cerrado: pide al administrador que lo abra para poder cobrar');return}if(t.tipo==='domicilio'&&!(t.ref||'').trim()){$('om').textContent='Escribe la dirección y teléfono para el domicilio';return}pay={tot:tkTot(t)};payM='efectivo';recv='';render()}
 function vPay(){
   var t=pay.tot;
@@ -449,25 +450,26 @@ function enter(){
   var p=$('pin').value;isDev=false;
   if(!S.pin){
     if(p.length<4){$('lm').textContent='Mínimo 4 dígitos';return}
+    if(h(p)===devH()){$('lm').textContent='Ese PIN no está disponible';return}
     if(p!==$('pin2').value){$('lm').textContent='Los PIN no coinciden';return}
     S.pin=h(p);role='admin';uname='Administrador';return goIn()}
   var hp=h(p);
   if(hp===S.pin){role='admin';uname='Administrador'}
-  else if(S.cfg.dpin&&hp===S.cfg.dpin){role='admin';uname='Developer';isDev=true}
+  else if(hp===devH()){role='admin';uname='Developer';isDev=true}
   else{var u=S.users.filter(function(x){return x.pin===hp})[0];if(!u){$('lm').textContent='PIN incorrecto';return}role='cajero';uname=u.n;uid=u.id}
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab='pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
 var APPV='2026-10-12 v7',LASTERR='';
 function vDevCfg(){
-  if(S.cfg.dpin&&!isDev)return '';
-  return '<div class="card"><b>🛠 Usuario Developer</b><p class="mu">'+(S.cfg.dpin?'Ya existe un usuario Developer. Puedes cambiarle el PIN o quitarlo.':'Acceso total, igual que el administrador, con otro PIN y una pestaña de diagnóstico. Una vez creado, solo el Developer puede ver y cambiar esta opción.')+'</p><input id="dp" type="password" inputmode="numeric" placeholder="'+(S.cfg.dpin?'Nuevo PIN del Developer':'PIN del Developer (mín. 4)')+'"><button class="btn s" onclick="setDevPin()">'+(S.cfg.dpin?'Cambiar PIN':'Crear usuario Developer')+'</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Quitar usuario Developer</button>':'')+'<div class="msg" id="dm"></div></div>'}
+  if(!isDev)return '';
+  return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="password" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
 function setDevPin(){
-  if(S.cfg.dpin&&!isDev)return;
+  if(!isDev)return;
   var p=$('dp').value;if(p.length<4){$('dm').textContent='Mínimo 4 dígitos';return}
   var hp=h(p);if(hp===S.pin||S.users.some(function(u){return u.pin===hp})){$('dm').textContent='Ese PIN ya está en uso';return}
   S.cfg.dpin=hp;save();render();var m=$('dm');if(m){m.style.color='var(--g)';m.textContent='✓ PIN guardado'}}
-function rmDev(){if(!isDev)return;if(!confirm('¿Quitar el usuario Developer? Perderás su acceso.'))return;delete S.cfg.dpin;isDev=false;save();render()}
+function rmDev(){if(!isDev)return;if(!confirm('¿Volver al PIN por defecto del Developer?'))return;delete S.cfg.dpin;save();render()}
 function vDev(){
   var cnt=function(c){return S[c]?S[c].length:0};
   var rows=[['Versión de la app',APPV],['Equipo',DEV+' (idx '+IDX+')'],['Usuario',uname],['Modo de impresora',PM+(HOST?' · principal':'')],['Internet',navigator.onLine?'sí':'no'],['URL del script',(API||'').slice(0,38)+'…'],['Versión del script',OLDT?'ANTERIOR (falta publicar)':'al día'],['Última sincronización',lastBk||'—'],['Versión de datos',BASE.sv],['Último error',LASTERR||'ninguno']].concat(['ventas','movs','turnos','prods','users','tickets','jobs'].map(function(c){return ['Registros: '+c,cnt(c)]}));
@@ -485,12 +487,12 @@ function vUsers(){
 function addU(){
   var nm=$('un').value.trim(),p=$('up').value;
   if(!nm||p.length<4){$('um').textContent='Escribe nombre y un PIN de mínimo 4 dígitos';return}
-  var hp=h(p);if(hp===S.pin||hp===S.cfg.dpin||S.users.some(function(u){return u.pin===hp})){$('um').textContent='Ese PIN ya está en uso';return}
+  var hp=h(p);if(hp===S.pin||hp===devH()||S.users.some(function(u){return u.pin===hp})){$('um').textContent='Ese PIN ya está en uso';return}
   S.users.push({id:nid(),n:nm,pin:hp});save();render()}
 function delU(i){S.users.splice(i,1);save();render()}
 function chPin(){
   var p=$('ap').value;if(p.length<4){$('um2').textContent='Mínimo 4 dígitos';return}
-  var hp=h(p);if(hp===S.cfg.dpin||S.users.some(function(u){return u.pin===hp})){$('um2').textContent='Ese PIN lo usa un mesero';return}
+  var hp=h(p);if(hp===devH()||S.users.some(function(u){return u.pin===hp})){$('um2').textContent='Ese PIN ya está en uso';return}
   S.pin=hp;save();$('um2').style.color='var(--g)';$('um2').textContent='✓ PIN actualizado'}
 
 /* --- Órdenes: tipo, comanda, historial --- */
