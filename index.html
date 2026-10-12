@@ -89,7 +89,7 @@ function render(){
     out+='<div class="tabs">'+t('reg','1 Registro',sub,'setSub')+t('his','2 Historial',sub,'setSub')+t('mov','3 Movimientos',sub,'setSub')+t('stk','4 Stock',sub,'setSub')+'</div>'+({reg:vReg,his:vHis,mov:vMov,stk:vStk}[sub])();
   }else if(tab==='ord')out+=vOrd();else if(tab==='set')out+=vSet();else if(tab==='pos')out+=vPos();else if(tab==='tur')out+=vTur();else out+=vVen();
   $('app').innerHTML=out}
-function setTab(x){tab=x;render()}
+function setTab(x){tab=x;render();if(x==='tur'||x==='ord'||x==='pos')doSync()}
 function setSub(x){sub=x;render()}
 function dlist(){return '<datalist id="dl">'+names().map(function(x){return '<option value="'+esc(x)+'">'}).join('')+'</datalist>'}
 
@@ -220,7 +220,7 @@ if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(
 /* ====== COBRAR / TURNO / RESUMEN ====== */
 var role='',uname='',cart=[],ed=false,pay=null,payM='efectivo',recv='',rc=null,vt=null,vpp='day',uidc=0;
 function norm(){S.users=S.users||[];S.prods=S.prods||[];S.turnos=S.turnos||[];S.cfg=S.cfg||{w:80,msg:'¡Gracias por su compra!'};S.nTk=S.nTk||0;S.prods.forEach(function(p){if(!p.id)p.id=nid()});S.users.forEach(function(u){if(!u.id)u.id=nid()})}
-function curT(){var t=S.turnos[S.turnos.length-1];return t&&!t.ci?t:null}
+function curT(){for(var i=0;i<S.turnos.length;i++)if(!S.turnos[i].ci)return S.turnos[i];return null}
 function nid(){var t=Math.max(Date.now(),(nid.last||0)+1);nid.last=t;return t*100+((DIDX||0)%100)}
 function money(v){return '$'+n(v).toFixed(2)}
 function cartTot(){return n(cart.reduce(function(a,l){return a+l.c*l.pr},0))}
@@ -253,7 +253,7 @@ function doPay(){
   var T=curT(),f=today(),hh=nowt();S.nTk++;
   cart.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:S.nTk,pago:payM,turno:T.id,tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim()})});
   rc={tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim(),tk:S.nTk,f:f,t:hh,items:cart.map(function(l){return {n:l.n,c:l.c,pr:l.pr}}),tot:t,pago:payM,recv:r,cambio:n(r-t)};
-  cart=[];pay=null;oref='';onota='';save();render()}
+  cart=[];pay=null;oref='';onota='';save();render();doSync()}
 function vDone(){return '<div class="card" style="text-align:center"><h1>✓ Venta #'+rc.tk+' cobrada</h1><div class="tot"><span>Total</span><b>'+money(rc.tot)+'</b></div>'+(rc.pago==='efectivo'?'<div class="tot"><span>Cambio</span><b>'+money(rc.cambio)+'</b></div>':'')+'<button class="btn" onclick="prn(cmdHtml(rc))">🖨 Imprimir comanda</button><button class="btn s" onclick="rc=null;render()">Nueva venta</button></div>'}
 function vMenu(){
   return '<div class="card"><b>Menú</b>'+S.prods.map(function(p,i){return '<div class="row" style="align-items:center;padding:4px 0"><div>'+esc(p.n)+' · '+money(p.pr)+'</div><div style="flex:none"><button class="btn x" onclick="delP('+i+')">✕</button></div></div>'}).join('')+
@@ -275,11 +275,11 @@ function tStats(T){
   vs.forEach(function(v){var m=v.c*v.pr;tot+=m;if(v.pago==='tarjeta')tj+=m;else ef+=m;tk[v.tk]=1});
   (T.cj||[]).forEach(function(m){if(m.tipo==='ingreso')ing+=m.monto;else ret+=m.monto});
   return {tot:n(tot),ef:n(ef),tj:n(tj),nt:Object.keys(tk).length,ing:n(ing),ret:n(ret),esp:n(T.fondo+ef+ing-ret),vs:vs}}
-function openT(){var f=parseFloat($('fd').value);if(isNaN(f)||f<0){$('tm').textContent='Escribe el efectivo inicial';return}S.turnos.push({u:uname,id:nid(),ab:{f:today(),t:nowt()},fondo:n(f),cj:[],ci:null});save();render()}
+async function openT(){var f=parseFloat($('fd').value);if(isNaN(f)||f<0){$('tm').textContent='Escribe el efectivo inicial';return}$('tm').textContent='Revisando si ya hay un turno abierto…';await doSync();if(curT()){render();return}S.turnos.push({u:uname,id:nid(),ab:{f:today(),t:nowt()},fondo:n(f),cj:[],ci:null});save();render();doSync()}
 function cajaMov(tipo){var m=parseFloat($('cm').value);if(!(m>0)){$('cmm').textContent='Escribe un monto';return}curT().cj.push({tipo:tipo,monto:n(m),nt:$('cn').value.trim(),t:nowt()});save();render()}
-function closeT(){var T=curT(),c=parseFloat($('cc').value);if(isNaN(c)){$('tm').textContent='Escribe el efectivo contado';return}var s=tStats(T);T.ci={f:today(),t:nowt(),contado:n(c),dif:n(c-s.esp)};cart=[];pay=null;rc=null;vt=T.id;save();render()}
+function closeT(){var T=curT(),c=parseFloat($('cc').value);if(isNaN(c)){$('tm').textContent='Escribe el efectivo contado';return}var s=tStats(T);T.ci={f:today(),t:nowt(),contado:n(c),dif:n(c-s.esp)};cart=[];pay=null;rc=null;vt=T.id;save();render();doSync()}
 function vTur(){
-  var T=curT(),o='';
+  var T=curT(),o='',nOp=S.turnos.filter(function(x){return !x.ci}).length;if(nOp>1)o+='<div class="card" style="border-color:var(--y)"><b>Hay '+nOp+' turnos abiertos</b><p class="mu">Se abrieron al mismo tiempo en las dos tablets. Cierra primero este turno y luego el siguiente.</p></div>';
   if(!T)o+='<div class="card"><b>Abrir turno</b><label>Efectivo inicial en caja ($)</label><input id="fd" type="number" inputmode="decimal" placeholder="0.00"><button class="btn s" onclick="openT()">Abrir turno</button><div class="msg" id="tm"></div></div>';
   else{var s=tStats(T);
     o+='<div class="card"><b>Turno abierto</b><p class="mu">Desde '+T.ab.f+' '+T.ab.t+' · Fondo '+money(T.fondo)+'</p><div class="sum"><div><b>'+money(s.tot)+'</b>ventas</div><div><b>'+money(s.ef)+'</b>efectivo</div><div><b>'+money(s.tj)+'</b>tarjeta</div></div><div class="sum"><div><b>'+s.nt+'</b>tickets</div><div><b>'+money(s.esp)+'</b>efectivo esperado</div></div></div>'+
@@ -448,7 +448,7 @@ async function doPay(){
   var items=cart.map(function(l){return {n:l.n,c:l.c,pr:l.pr}});
   cart.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:tk,pago:payM,turno:T.id,tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim()})});
   rc={tipo:otype,ref:oref.trim(),mesero:uname,nota:onota.trim(),tk:tk,f:f,t:hh,items:items,tot:t,pago:payM,recv:r,cambio:n(r-t)};
-  cart=[];pay=null;oref='';onota='';save();render()}
+  cart=[];pay=null;oref='';onota='';save();render();doSync()}
 async function activate(){
   var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),m=$('gm');
   if(!c){m.textContent='Escribe el código';return}
