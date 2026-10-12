@@ -268,7 +268,7 @@ function vTicket(){
   '<button class="btn s" onclick="goPay()"'+(tot>0?'':' disabled')+'>Cerrar ticket y cobrar '+money(tot)+'</button>'+
   '<button class="btn" onclick="printCmd(ctk())"'+(tot>0?'':' disabled')+'>🖨 Comanda a cocina</button>'+
   '<button class="btn o" onclick="leaveTk()">Guardar y dejar abierto</button>'+
-  '<button class="btn o" onclick="cancelTk()">Cancelar ticket</button>'+(cxAsk?'<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Código del administrador</b><input id="apin" type="password" inputmode="numeric" placeholder="PIN del administrador" style="margin-top:6px"><div class="msg" id="cxm"></div><button class="btn" style="background:var(--r)" onclick="doCancel(false)">Confirmar cancelación</button><button class="btn o" onclick="cxAsk=false;render()">No cancelar</button></div>':'')+'</div></div>'}
+  '<button class="btn o" onclick="cancelTk()">Cancelar ticket</button>'+(cxAsk?'<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Código del administrador</b><input id="apin" type="password" inputmode="numeric" placeholder="PIN del administrador" style="margin-top:6px"><div class="msg" id="cxm"></div><button class="btn" style="background:var(--r)" onclick="doCancel()">Confirmar cancelación</button><button class="btn o" onclick="cxAsk=false;render()">No cancelar</button></div>':'')+'</div></div>'}
 function addC(i){var t=ctk(),p=S.prods[i];if(!t||!p)return;var x=t.items.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else t.items.push({n:p.n,pr:p.pr,c:1});save();render()}
 function qC(i,d){var t=ctk();if(!t||!t.items[i])return;t.items[i].c+=d;if(t.items[i].c<=0)t.items.splice(i,1);save();render()}
 function setRef(v){var t=ctk();if(t){t.ref=v;save()}}
@@ -276,8 +276,8 @@ function setNota(v){var t=ctk();if(t){t.nota=v;save()}}
 function setTipo(x){var t=ctk();if(t){t.tipo=x;save();render()}}
 function leaveTk(){cxAsk=false;var t=ctk();if(t&&!t.items.length)S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;save();render();doSync()}
 var cxAsk=false;
-function cancelTk(){var t=ctk();if(!t)return;if(role==='admin'){if(confirm('¿Cancelar el ticket #'+t.tk+'? Se borra sin cobrar.'))doCancel(true);return}cxAsk=true;render()}
-function doCancel(ok){var t=ctk();if(!t)return;if(!ok){var p=($('apin')||{}).value||'';if(!S.pin||h(p)!==S.pin){var m=$('cxm');if(m)m.textContent='Código incorrecto';return}}S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;cxAsk=false;save();render();doSync()}
+function cancelTk(){var t=ctk();if(!t)return;cxAsk=true;render()}
+function doCancel(){var t=ctk();if(!t)return;var p=($('apin')||{}).value||'';if(!S.pin||h(p)!==S.pin){var m=$('cxm');if(m)m.textContent='Código incorrecto';return}S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;cxAsk=false;save();render();doSync()}
 function goPay(){var t=ctk();if(!t||!t.items.length)return;if(t.tipo==='domicilio'&&!(t.ref||'').trim()){$('om').textContent='Escribe la dirección y teléfono para el domicilio';return}pay={tot:tkTot(t)};payM='efectivo';recv='';render()}
 function vPay(){
   var t=pay.tot;
