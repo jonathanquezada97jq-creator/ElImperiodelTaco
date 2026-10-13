@@ -33,7 +33,7 @@ th{font-size:12px;color:var(--mu)}
 .mu{color:var(--mu);font-size:13px}
 #lock{max-width:340px;margin:12vh auto;text-align:center}
 .msg{color:var(--r);font-size:13px;min-height:18px}
-body{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}input{-webkit-user-select:text;user-select:text}
+body{-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}input{-webkit-user-select:text;user-select:text}.pw{-webkit-text-security:disc;text-security:disc}
 @media(min-width:768px){body{font-size:17px}.w{max-width:980px;padding:22px}h1{font-size:28px}input,select{padding:14px;font-size:17px}.tabs button{padding:15px;font-size:17px}.btn{padding:15px;font-size:17px}th,td{padding:11px 7px;font-size:16px}.sum b{font-size:22px}}
 .pos{display:grid;grid-template-columns:1fr;gap:12px}@media(min-width:768px){.pos{grid-template-columns:1.3fr 1fr}}
 .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px}
@@ -74,7 +74,7 @@ function rangeLabel(){
 /* ---------- Acceso ---------- */
 function lockView(){
   var first=!S.pin;
-  $('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>'+(first?'Configurar administrador':'Acceso protegido')+'</h1><p class="mu">'+(first?'Este dispositivo quedará autorizado. Crea tu PIN de administrador.':'Ingresa tu PIN (administrador o mesero).')+'</p><input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">'+(first?'<input id="pin2" type="password" inputmode="numeric" placeholder="Repite el PIN" style="margin-top:8px">':'')+'<div class="msg" id="lm"></div><button class="btn" onclick="enter()">'+(first?'Guardar y entrar':'Entrar')+'</button></div>'}
+  $('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>'+(first?'Configurar administrador':'Acceso protegido')+'</h1><p class="mu">'+(first?'Este dispositivo quedará autorizado. Crea tu PIN de administrador.':'Ingresa tu PIN (administrador o mesero).')+'</p><input id="pin" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="PIN" autocomplete="off">'+(first?'<input id="pin2" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Repite el PIN" style="margin-top:8px">':'')+'<div class="msg" id="lm"></div><button class="btn" onclick="enter()">'+(first?'Guardar y entrar':'Entrar')+'</button></div>'}
 function logout(){auth=false;isDev=false;role='';lockView()}
 function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){return m.p===v}).pop();if(l)$('u').value=l.u}
 
@@ -279,7 +279,7 @@ function vTicket(){
   (cc?'<button class="btn s" onclick="goPay()"'+(tot>0?'':' disabled')+'>Cerrar ticket y cobrar '+money(tot)+'</button>':'')+
   (co?'<button class="btn'+(cc?'':' s')+'" onclick="printCmd(ctk())"'+(tot>0?'':' disabled')+'>🖨 Comanda a cocina</button>':'')+
   '<button class="btn o" onclick="leaveTk()">'+(co?'Guardar y dejar abierto':'← Volver a la lista')+'</button>'+
-  (isDev&&t.mesero==='Developer'?'<button class="btn o" onclick="devDelTk()">🗑 Eliminar ticket (Developer)</button>':'')+'<button class="btn o" onclick="cancelTk()">Cancelar ticket</button>'+(cxAsk?'<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Cancelar ticket</b><input id="cxn" placeholder="Motivo de la cancelación (obligatorio)" style="margin-top:6px"><b style="display:block;margin-top:8px">Código del administrador</b><input id="apin" type="password" inputmode="numeric" placeholder="PIN del administrador" style="margin-top:6px"><div class="msg" id="cxm"></div><button class="btn" style="background:var(--r)" onclick="doCancel()">Confirmar cancelación</button><button class="btn o" onclick="cxAsk=false;render()">No cancelar</button></div>':'')+'</div></div>'}
+  (isDev&&t.mesero==='Developer'?'<button class="btn o" onclick="devDelTk()">🗑 Eliminar ticket (Developer)</button>':'')+'<button class="btn o" onclick="cancelTk()">Cancelar ticket</button>'+(cxAsk?'<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Cancelar ticket</b><input id="cxn" placeholder="Motivo de la cancelación (obligatorio)" style="margin-top:6px"><b style="display:block;margin-top:8px">Código del administrador</b><input id="apin" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="PIN del administrador" style="margin-top:6px"><div class="msg" id="cxm"></div><button class="btn" style="background:var(--r)" onclick="doCancel()">Confirmar cancelación</button><button class="btn o" onclick="cxAsk=false;render()">No cancelar</button></div>':'')+'</div></div>'}
 function addC(i){var t=ctk(),p=S.prods[i];if(!t||!p||!can('po'))return;var x=t.items.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else t.items.push({n:p.n,pr:p.pr,c:1});save();render()}
 function qC(i,d){var t=ctk();if(!t||!t.items[i]||!can('po'))return;t.items[i].c+=d;if(t.items[i].c<=0)t.items.splice(i,1);save();render()}
 function setRef(v){var t=ctk();if(t&&can('po')){t.ref=v;save()}}
@@ -296,7 +296,7 @@ function vPay(){
   (payM==='efectivo'?'<label>Efectivo recibido (vacío = exacto)</label><input id="rv" type="number" inputmode="decimal" value="'+esc(recv)+'" oninput="recv=this.value;chg()" placeholder="'+t+'"><div class="tot"><span>Cambio</span><b id="cg">'+money(Math.max(0,(parseFloat(recv)||t)-t))+'</b></div>':'')+
   '<button class="btn s" id="pbtn" onclick="doPay()">Confirmar cobro</button><button class="btn o" onclick="pay=null;render()">← Volver</button><div class="msg" id="pm"></div></div>'}
 function chg(){var t=pay.tot,r=parseFloat(recv);$('cg').textContent=money(Math.max(0,(isNaN(r)?t:r)-t))}
-function vDone(){return '<div class="card" style="text-align:center"><h1>✓ Venta #'+rc.tk+' cobrada</h1><div class="tot"><span>Total</span><b>'+money(rc.tot)+'</b></div><div class="tot"><span>Forma de pago</span><b>'+pl(rc.pago)+'</b></div>'+(rc.pago==='efectivo'?'<div class="tot"><span>Cambio</span><b>'+money(rc.cambio)+'</b></div>':'')+'<button class="btn" onclick="printRecibo(rc)">🖨 Imprimir ticket de venta</button><button class="btn o" onclick="printCmd(rc)">🖨 Comanda</button><button class="btn s" onclick="rc=null;render()">Nueva venta</button></div>'}
+function vDone(){return '<div class="card" style="text-align:center"><h1>✓ Venta #'+rc.tk+' cobrada</h1><div class="tot"><span>Total</span><b>'+money(rc.tot)+'</b></div><div class="tot"><span>Forma de pago</span><b>'+pl(rc.pago)+'</b></div>'+(rc.pago==='efectivo'?'<div class="tot"><span>Cambio</span><b>'+money(rc.cambio)+'</b></div>':'')+'<button class="btn" onclick="printCmd(rc)">🖨 Comanda</button><button class="btn s" onclick="rc=null;render()">Nueva venta</button></div>'}
 function vMenu(){
   return '<div class="card"><b>Menú</b>'+catList()+S.prods.map(function(p,i){return '<div class="row" style="align-items:center;padding:4px 0"><div>'+esc(p.n)+' · '+money(p.pr)+'</div><div><input list="dcat" value="'+esc(p.cat||'')+'" placeholder="Categoría" onchange="setCat('+i+',this.value)"></div><div style="flex:none"><button class="btn x" onclick="delP('+i+')">✕</button></div></div>'}).join('')+
   '<div class="row"><input id="pn" placeholder="Producto"><input id="pp" type="number" inputmode="decimal" placeholder="Precio"></div><input id="pc" list="dcat" placeholder="Categoría (ej: Tacos)" style="margin-top:6px"><button class="btn s" onclick="addP()">Agregar al menú</button><div class="msg" id="pmm"></div>'+
@@ -461,10 +461,10 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab='pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-12 v7',LASTERR='';
+var APPV='2026-10-13 v9',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
-  return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="password" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
+  return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
 function setDevPin(){
   if(!isDev)return;
   var p=$('dp').value;if(p.length<4){$('dm').textContent='Mínimo 4 dígitos';return}
@@ -495,8 +495,8 @@ function userRows(){return S.users.map(function(u,i){var cb=function(k,l){return
 function vUsers(){
   return '<div class="card"><b>Meseros</b><p class="mu">Tú decides qué puede hacer cada persona: <b>Crear órdenes</b> (abrir tickets y agregar productos) y <b>Cobrar</b> (cerrar el ticket y recibir el pago). Todos ven Historial de órdenes e Impresora. El administrador ve todo (incluido el Turno).</p>'+
   userRows()+
-  '<div class="row"><input id="un" placeholder="Nombre del mesero"><input id="up" type="password" inputmode="numeric" placeholder="PIN (mín. 4)"></div><button class="btn s" onclick="addU()">Agregar mesero</button><div class="msg" id="um"></div>'+
-  '<label>Cambiar PIN de administrador</label><input id="ap" type="password" inputmode="numeric" placeholder="Nuevo PIN"><button class="btn o" onclick="chPin()">Guardar PIN</button><div class="msg" id="um2"></div></div>'}
+  '<div class="row"><input id="un" placeholder="Nombre del mesero"><input id="up" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="PIN (mín. 4)"></div><button class="btn s" onclick="addU()">Agregar mesero</button><div class="msg" id="um"></div>'+
+  '<label>Cambiar PIN de administrador</label><input id="ap" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN"><button class="btn o" onclick="chPin()">Guardar PIN</button><div class="msg" id="um2"></div></div>'}
 function addU(){
   var nm=$('un').value.trim(),p=$('up').value;
   if(!nm||p.length<4){$('um').textContent='Escribe nombre y un PIN de mínimo 4 dígitos';return}
@@ -620,7 +620,7 @@ function doPay(){
   t.items.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:t.tk,pago:payM,turno:T.id,tipo:t.tipo,ref:ref,mesero:mes,nota:nota})});
   rc={tipo:t.tipo,ref:ref,mesero:mes,nota:nota,tk:t.tk,f:f,t:hh,items:t.items.map(function(l){return {n:l.n,c:l.c,pr:l.pr}}),tot:tot,pago:payM,recv:r,cambio:n(r-tot)};
   S.tickets=S.tickets.filter(function(x){return x.id!==t.id});
-  curTk=null;pcat=null;pay=null;save();render();if(PM!=='nav')printRecibo(rc);else doSync()}
+  curTk=null;pcat=null;pay=null;save();render();doSync()}
 async function activate(){
   var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),m=$('gm');
   if(!c){m.textContent='Escribe el código';return}
