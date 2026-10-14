@@ -75,11 +75,23 @@ function rangeLabel(){
 function lockView(){
   var first=!S.pin;
   $('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>'+(first?'Configurar administrador':'Acceso protegido')+'</h1><p class="mu">'+(first?'Este dispositivo quedará autorizado. Crea tu PIN de administrador.':'Ingresa tu PIN (administrador o mesero).')+'</p><input id="pin" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="PIN" autocomplete="off">'+(first?'<input id="pin2" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Repite el PIN" style="margin-top:8px">':'')+'<div class="msg" id="lm"></div><button class="btn" onclick="enter()">'+(first?'Guardar y entrar':'Entrar')+'</button></div>'}
-function logout(){auth=false;isDev=false;role='';lockView()}
+/* --- Sesión: si la tablet recarga la app (Android la cierra en segundo plano), se entra sola sin pedir PIN otra vez, hasta 3 horas sin tocarla --- */
+var SESS_MAX=3*3600*1000,SESS_T=0;
+var SESS_C=-1;
+function saveSess(f){if(!auth)return;var n=Date.now(),cc=curTk?curTk.id:0;if(!f&&cc===SESS_C&&n-SESS_T<4000)return;SESS_T=n;SESS_C=cc;try{localStorage.setItem('inv_sess',JSON.stringify({role:role,uname:uname,uid:uid,dev:isDev?1:0,tab:tab,cur:curTk?curTk.id:0,ts:n}))}catch(e){}}
+function clearSess(){try{localStorage.removeItem('inv_sess')}catch(e){}}
+function restoreSess(){try{var o=JSON.parse(localStorage.getItem('inv_sess')||'null');if(!o||!S.pin||Date.now()-o.ts>SESS_MAX)return false;
+  if(o.dev){if(!(S.cfg.dpin||true))return false;role='admin';uname='Developer';isDev=true}
+  else if(o.role==='admin'){role='admin';uname='Administrador'}
+  else{var u=S.users.filter(function(x){return x.id===o.uid})[0];if(!u)return false;role='cajero';uname=u.n;uid=u.id}
+  auth=true;if(o.tab)tab=o.tab;if(o.cur)curTk=S.tickets.filter(function(x){return x.id===o.cur&&!x.cx})[0]||null;return true}catch(e){return false}}
+if(document.addEventListener){['pointerdown','keydown'].forEach(function(ev){document.addEventListener(ev,function(){saveSess(false)},true)})}
+function logout(){auth=false;isDev=false;role='';clearSess();lockView()}
 function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){return m.p===v}).pop();if(l)$('u').value=l.u}
 
 /* ---------- Estructura ---------- */
 function render(){
+  saveSess(false);
   if(API.indexOf('PEGA_AQUI')===0)return apiView();
   if(gate!=='ok')return gateView();
   if(!auth)return lockView();
@@ -262,7 +274,8 @@ function vTickets(){
     return '<div style="padding:12px 0;border-bottom:1px solid var(--bd);cursor:pointer" onclick="openTk('+t.id+')"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+t.tk+' · '+tl(t.tipo)+(t.ref?' · '+esc(t.ref):'')+'</b><b>'+money(tkTot(t))+'</b></div><div class="mu">'+esc(t.mesero||'')+' · abierto '+t.t+' · '+q+' productos</div></div>'}).join(''):'<p class="mu">No hay tickets abiertos.'+(can('po')?' Toca “Nuevo ticket” para empezar.':'')+'</p>')+'</div>'}
 async function newTk(tipo){if(!can('po'))return;tipo=tipo||'aqui';
   if(newTk.busy)return;newTk.busy=1;var b=$('nbar');if(b)b.style.opacity='.5';
-  var tk=await getTk();newTk.busy=0;
+  var ov=document.createElement('div');ov.style.cssText='position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:98;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:bold';ov.textContent='Creando ticket…';document.body.appendChild(ov);
+  var tk;try{tk=await getTk()}finally{newTk.busy=0;try{ov.parentNode.removeChild(ov)}catch(e){}}
   var t={id:nid(),tk:tk,f:today(),t:nowt(),tipo:tipo,ref:'',nota:'',mesero:uname,items:[]};
   S.tickets.push(t);curTk=t;pcat=null;save();render()}
 function openTk(id){cxAsk=false;rmAsk=null;curTk=S.tickets.filter(function(x){return x.id===id})[0]||null;pcat=null;render()}
@@ -333,21 +346,21 @@ function EP(){var b=[0x1B,0x40,0x1B,0x74,0x00],o={
   al:function(a){b.push(0x1B,0x61,a);return o},
   sz:function(w,hh){b.push(0x1D,0x21,((w-1)<<4)|(hh-1));return o},
   bd:function(on){b.push(0x1B,0x45,on?1:0);return o},
-  cut:function(){o.nl(4);b.push(0x1D,0x56,0x42,0x00);return o},
+  cut:function(){o.nl(5);return o},   // la PT-210 no tiene cortador: solo avanza papel (el comando de corte podía hacer que la impresora se comiera lo siguiente)
   b:b};return o}
 function lnW(){return new Array(colsW()+1).join('-')}
 function lr(a,c){var sp=colsW()-a.length-c.length;return a+(sp>0?new Array(sp+1).join(' '):' ')+c}
 function cmdTot(o){var t=0;o.items.forEach(function(i){t+=(i.c||0)*(i.pr||0)});return Math.round(t*100)/100}
 function cmdBytes(o){
-  var e=EP(),ln=lnW();
-  e.al(1).sz(2,2).bd(1).t('COMANDA #'+o.tk).nl().sz(1,2).t(tl(o.tipo).toUpperCase()).nl().sz(1,1).bd(0);
+  var e=EP(),ln=lnW(),eq=new Array(colsW()+1).join('=');
+  e.t(eq).nl().al(1).sz(2,2).bd(1).t('COMANDA #'+o.tk).nl().sz(1,2).t(tl(o.tipo).toUpperCase()).nl().sz(1,1).bd(0);
   if(o.ref)e.sz(o.tipo==='aqui'?2:1,2).bd(1).t(refLabel(o.tipo)+': '+o.ref).nl().sz(1,1).bd(0);
   e.t(o.f+' '+o.t+(o.mesero?' '+o.mesero:'')).nl().al(0).t(ln).nl();
   o.items.forEach(function(i){e.sz(1,2).bd(1).t(i.c+' x '+i.n).nl()});
   e.sz(1,1).bd(0);
   e.t(ln).nl().sz(1,2).bd(1).t(lr('TOTAL',money(cmdTot(o)))).nl().sz(1,1).bd(0);
   if(o.nota)e.t(ln).nl().bd(1).t('NOTA: ').bd(0).t(o.nota).nl();
-  e.t(ln).cut();return e.b}
+  e.t(ln).nl().t(eq).cut();return e.b}
 function resBytes(T){
   var e=EP(),ln=lnW();
   e.al(1).bd(1).t('El Imperio del Taco').nl().bd(0).t('Resumen de turno').nl().al(0).t(ln).nl();
@@ -406,7 +419,7 @@ async function btPrint(by){
       if(!BTc){alert('No encontré cómo escribir en esa impresora (casi seguro es Bluetooth clásico). Usa el modo RawBT.');return}
       d.addEventListener('gattserverdisconnected',function(){BTc=null})
     }
-    for(var k=0;k<by.length;k+=100){var ch=new Uint8Array(by.slice(k,k+100));if(BTc.properties.writeWithoutResponse)await BTc.writeValueWithoutResponse(ch);else await BTc.writeValue(ch);await new Promise(function(r){setTimeout(r,30)})}
+    for(var k=0;k<by.length;k+=60){var ch=new Uint8Array(by.slice(k,k+60));if(BTc.properties.writeWithoutResponse)await BTc.writeValueWithoutResponse(ch);else await BTc.writeValue(ch);await new Promise(function(r){setTimeout(r,45)})}
   }catch(e){BTc=null;alert('No se pudo imprimir: '+((e&&e.message)||e))}}
 function vPrn(){
   var op=function(v,l){return '<option value="'+v+'"'+(PM===v?' selected':'')+'>'+l+'</option>'};
@@ -471,7 +484,7 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab='pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-13 v10',LASTERR='';
+var APPV='2026-10-13 v13',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
   return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
@@ -530,8 +543,8 @@ function vCanc(){
   return '<div class="card"><b>Tickets cancelados ('+l.length+')</b>'+l.map(function(t){return '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+t.tk+' · '+tl(t.tipo)+(t.ref?' · '+esc(t.ref):'')+'</b><b>'+money(tkTot(t))+'</b></div><div class="mu">'+esc(t.cxf||'')+' '+esc(t.cxt||'')+' · cancelado por '+esc(t.cxby||'')+'</div><div>'+t.items.map(function(x){return x.c+' x '+esc(x.n)}).join(', ')+'</div><div><b>Motivo:</b> '+esc(t.cxm||'')+'</div></div>'}).join('')+'</div>'}
 function ordersOf(l){var m={};l.forEach(function(v){var o=m[v.tk]=m[v.tk]||{tk:v.tk,f:v.f,t:v.t,tipo:v.tipo,ref:v.ref,mesero:v.mesero,pago:v.pago,nota:v.nota,items:[],tot:0};o.items.push({n:v.p,c:v.c,pr:v.pr});o.tot+=v.c*v.pr});return Object.keys(m).map(function(k){return m[k]}).sort(function(a,b){return b.tk-a.tk})}
 function cmdHtml(o){
-  return '<div style="text-align:center;font-size:20px;font-weight:bold">COMANDA #'+o.tk+'</div><div style="text-align:center;font-size:17px;font-weight:bold">'+tl(o.tipo).toUpperCase()+'</div>'+(o.ref?'<div style="text-align:center;font-size:22px;font-weight:bold">'+esc(refLabel(o.tipo))+': '+esc(o.ref)+'</div>':'')+'<div style="text-align:center">'+o.f+' '+o.t+(o.mesero?' · '+esc(o.mesero):'')+'</div><hr>'+
-  o.items.map(function(i){return '<div style="font-size:16px;font-weight:bold;padding:2px 0">'+i.c+' x '+esc(i.n)+'</div>'}).join('')+'<hr><div style="display:flex;justify-content:space-between;font-size:20px;font-weight:bold"><span>TOTAL</span><span>'+money(cmdTot(o))+'</span></div>'+(o.nota?'<hr><b>NOTA:</b> '+esc(o.nota):'')+'<hr><br>'}
+  return '<hr style="border-top:3px double #000"><div style="text-align:center;font-size:20px;font-weight:bold">COMANDA #'+o.tk+'</div><div style="text-align:center;font-size:17px;font-weight:bold">'+tl(o.tipo).toUpperCase()+'</div>'+(o.ref?'<div style="text-align:center;font-size:22px;font-weight:bold">'+esc(refLabel(o.tipo))+': '+esc(o.ref)+'</div>':'')+'<div style="text-align:center">'+o.f+' '+o.t+(o.mesero?' · '+esc(o.mesero):'')+'</div><hr>'+
+  o.items.map(function(i){return '<div style="font-size:16px;font-weight:bold;padding:2px 0">'+i.c+' x '+esc(i.n)+'</div>'}).join('')+'<hr><div style="display:flex;justify-content:space-between;font-size:20px;font-weight:bold"><span>TOTAL</span><span>'+money(cmdTot(o))+'</span></div>'+(o.nota?'<hr><b>NOTA:</b> '+esc(o.nota):'')+'<hr><hr style="border-top:3px double #000"><br>'}
 function tipoSum(l){
   var m={};ordersOf(l.filter(function(v){return v.tk&&v.tipo})).forEach(function(o){var x=m[o.tipo]=m[o.tipo]||{c:0,t:0};x.c++;x.t+=o.tot});
   var k=Object.keys(m);if(!k.length)return '';
@@ -557,17 +570,17 @@ function hr(r){return h(JSON.stringify(r))}
 function cfgObj(){var o={};for(var k in S.cfg)o[k]=S.cfg[k];o.pin=S.pin||'';return o}
 function cfgOp(){if(!S.pin)return null;var o=cfgObj();return h(JSON.stringify(o))!==BASE.cfgh?{data:o,v:BASE.cv}:null}
 function buildOps(limit){
-  var ops={},cnt=0,more=false;
+  var ops={},cnt=0,more=false,snap={};
   COLS.forEach(function(c){
     var b=BASE.h[c],set=[],del=[],seen={};
     S[c].forEach(function(r){var k=String(r.id);seen[k]=1;if(b[k]!==hr(r))set.push(r)});
     Object.keys(b).forEach(function(k){if(!seen[k])del.push(isNaN(Number(k))?k:Number(k))});
     if(cnt+set.length>limit){set=set.slice(0,Math.max(limit-cnt,0));more=true}
-    cnt+=set.length;
+    cnt+=set.length;snap[c]={};set.forEach(function(r){snap[c][String(r.id)]=hr(r)});
     if(cnt+del.length>limit){del=del.slice(0,Math.max(limit-cnt,0));more=true}
     cnt+=del.length;
     if(set.length||del.length)ops[c]={set:set,del:del}});
-  return {ops:ops,cnt:cnt,more:more}}
+  return {ops:ops,cnt:cnt,more:more,snap:snap}}
 function applyResp(r){
   COLS.forEach(function(c){
     var l={};S[c].forEach(function(x){l[String(x.id)]=x});
@@ -609,7 +622,7 @@ async function doSync(){
       if(!r.ok){if(r.revoked){lockOut();syncing=false;return}throw new Error(r.msg||'ERR')}
       if(r.ver===undefined)throw new Error('OLDSRV');OLDT=((r.v2||0)<3);if(!OLDT&&!BASE.t2){BASE.t2=1;BASE.h.tickets={};saveBase();continue}
       if(r.reset){BASE.h={ventas:{},movs:{},turnos:{},prods:{},users:{},tickets:{},jobs:{}};BASE.cv=0;BASE.cfgh='';BASE.sv=0;continue}
-      COLS.forEach(function(c){var o=b.ops[c];if(!o)return;if((c==='tickets'||c==='jobs')&&OLDT)return;o.set.forEach(function(rec){BASE.h[c][String(rec.id)]=hr(rec)});o.del.forEach(function(id){delete BASE.h[c][String(id)]})});
+      COLS.forEach(function(c){var o=b.ops[c];if(!o)return;if((c==='tickets'||c==='jobs')&&OLDT)return;o.set.forEach(function(rec){BASE.h[c][String(rec.id)]=b.snap[c][String(rec.id)]});o.del.forEach(function(id){delete BASE.h[c][String(id)]})});
       applyResp(r);BASE.sv=r.ver;saveBase();
       if(!b.more&&!r.more)break}
     persist();pend=false;lastBk=nowt();setBk(OLDT?'⚠ Falta publicar la NUEVA versión del script de Google: los tickets y la impresión compartida NO funcionan ↻':'☁ Sincronizado '+lastBk+' ↻');
@@ -646,7 +659,7 @@ async function init(){
   DIDX=IDX||(Math.abs(parseInt(h(DEV).slice(1))||0)%90+10);
   loadBase();
   if(!CODE||!apiOk()){gate='no';render();return}
-  gate='ok';
+  gate='ok';restoreSess();
   if(!S.pin)$('app').innerHTML='<div id="lock" class="card"><p>Sincronizando…</p></div>';else render();
   try{var r=await api({action:'auth'});if(!r.ok&&r.revoked){lockOut();return}if(r.idx){IDX=r.idx;DIDX=IDX;try{localStorage.setItem('inv_idx',String(IDX))}catch(e){}}}catch(e){}
   await doSync();
