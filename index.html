@@ -265,7 +265,7 @@ async function newTk(tipo){if(!can('po'))return;tipo=tipo||'aqui';
   var tk=await getTk();newTk.busy=0;
   var t={id:nid(),tk:tk,f:today(),t:nowt(),tipo:tipo,ref:'',nota:'',mesero:uname,items:[]};
   S.tickets.push(t);curTk=t;pcat=null;save();render()}
-function openTk(id){cxAsk=false;curTk=S.tickets.filter(function(x){return x.id===id})[0]||null;pcat=null;render()}
+function openTk(id){cxAsk=false;rmAsk=null;curTk=S.tickets.filter(function(x){return x.id===id})[0]||null;pcat=null;render()}
 function selCat(i){var c=cats()[i];pcat=c?c.n:null;render()}
 function vTicket(){
   var t=curTk,tot=tkTot(t),co=can('po'),cc=can('pc'),left='';
@@ -273,7 +273,8 @@ function vTicket(){
   else if(!S.prods.length)left='<p class="mu">Aún no hay productos. El administrador debe agregarlos en ⚙ Ajustes. Si ya los agregó, toca la línea ☁ de arriba para sincronizar.</p>';
   else if(pcat===null)left='<b>Categorías</b><div class="pg" style="margin-top:8px">'+cats().map(function(c,i){return '<button class="pb" onclick="selCat('+i+')"><b>'+esc(c.n)+'</b><br><span class="mu">'+c.k+' productos</span></button>'}).join('')+'</div>';
   else left='<button class="btn o" style="margin:0 0 10px" onclick="pcat=null;render()">← Categorías</button><b>'+esc(pcat)+'</b><div class="pg" style="margin-top:8px">'+S.prods.map(function(p,i){return catOf(p)===pcat?'<button class="pb" onclick="addC('+i+')"><b>'+esc(p.n)+'</b><br>'+money(p.pr)+'</button>':''}).join('')+'</div>';
-  var ch=t.items.length?t.items.map(function(l,i){return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+esc(l.n)+'<br><span class="mu">'+money(l.pr)+'</span></div>'+(co?'<div class="q" style="flex:none"><button onclick="qC('+i+',-1)">−</button><b>'+l.c+'</b><button onclick="qC('+i+',1)">＋</button></div>':'<div style="flex:none"><b>× '+l.c+'</b></div>')+'<div style="text-align:right;flex:none;min-width:70px"><b>'+money(l.c*l.pr)+'</b></div></div>'}).join(''):'<p class="mu">'+(co?'Elige una categoría y toca un producto para agregarlo.':'El ticket no tiene productos.')+'</p>';
+  var ch=t.items.length?t.items.map(function(l,i){return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+esc(l.n)+'<br><span class="mu">'+money(l.pr)+((l.pc||0)>0?' · 🔒 '+l.pc+' enviado'+(l.pc>1?'s':'')+' a cocina':'')+'</span></div>'+(co?'<div class="q" style="flex:none"><button onclick="qC('+i+',-1)">−</button><b>'+l.c+'</b><button onclick="qC('+i+',1)">＋</button></div>':'<div style="flex:none"><b>× '+l.c+'</b></div>')+'<div style="text-align:right;flex:none;min-width:70px"><b>'+money(l.c*l.pr)+'</b></div></div>'}).join(''):'<p class="mu">'+(co?'Elige una categoría y toca un producto para agregarlo.':'El ticket no tiene productos.')+'</p>';
+  if(rmAsk&&rmAsk.id===t.id)ch+='<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Quitar «'+esc(rmAsk.n)+'»</b><p class="mu">Ya se mandó a cocina. Para quitarlo necesitas el código del administrador.</p><input id="rmp" type="text" class="pw" autocomplete="off" inputmode="numeric" placeholder="PIN del administrador"><div class="msg" id="rmm"></div><button class="btn" style="background:var(--r)" onclick="rmOk()">Quitar 1</button><button class="btn o" onclick="rmNo()">Cancelar</button></div>';
   var info=co?otypeHtml():'<div class="mu" style="margin:8px 0">'+tl(t.tipo)+(t.ref?' · '+esc(refLabel(t.tipo))+': '+esc(t.ref):'')+(t.nota?'<br>Nota: '+esc(t.nota):'')+'</div>';
   return '<div class="pos"><div class="card">'+left+'</div><div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><b>Ticket #'+t.tk+'</b><span class="mu">'+esc(t.mesero||'')+' · '+t.t+'</span></div>'+info+ch+'<div class="tot"><span>Total</span><b>'+money(tot)+'</b></div>'+
   (cc?'<button class="btn s" onclick="goPay()"'+(tot>0?'':' disabled')+'>Cerrar ticket y cobrar '+money(tot)+'</button>':'')+
@@ -281,11 +282,19 @@ function vTicket(){
   '<button class="btn o" onclick="leaveTk()">'+(co?'Guardar y dejar abierto':'← Volver a la lista')+'</button>'+
   (isDev&&t.mesero==='Developer'?'<button class="btn o" onclick="devDelTk()">🗑 Eliminar ticket (Developer)</button>':'')+'<button class="btn o" onclick="cancelTk()">Cancelar ticket</button>'+(cxAsk?'<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Cancelar ticket</b><input id="cxn" placeholder="Motivo de la cancelación (obligatorio)" style="margin-top:6px"><b style="display:block;margin-top:8px">Código del administrador</b><input id="apin" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="PIN del administrador" style="margin-top:6px"><div class="msg" id="cxm"></div><button class="btn" style="background:var(--r)" onclick="doCancel()">Confirmar cancelación</button><button class="btn o" onclick="cxAsk=false;render()">No cancelar</button></div>':'')+'</div></div>'}
 function addC(i){var t=ctk(),p=S.prods[i];if(!t||!p||!can('po'))return;var x=t.items.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else t.items.push({n:p.n,pr:p.pr,c:1});save();render()}
-function qC(i,d){var t=ctk();if(!t||!t.items[i]||!can('po'))return;t.items[i].c+=d;if(t.items[i].c<=0)t.items.splice(i,1);save();render()}
+var rmAsk=null;
+function qC(i,d){var t=ctk();if(!t||!t.items[i]||!can('po'))return;var l=t.items[i];
+  if(d<0&&(l.pc||0)>0&&l.c+d<l.pc){rmAsk={id:t.id,i:i,n:l.n};render();return}
+  rmAsk=null;l.c+=d;if(l.c<=0)t.items.splice(i,1);save();render()}
+function rmOk(){var t=ctk(),m=$('rmm'),p=($('rmp')||{}).value||'';if(!t||!rmAsk||rmAsk.id!==t.id)return;
+  if(!S.pin||(h(p)!==S.pin&&h(p)!==devH())){m.textContent='Código incorrecto';return}
+  var l=t.items[rmAsk.i];rmAsk=null;if(!l){render();return}
+  l.c-=1;if(l.pc>l.c)l.pc=Math.max(l.c,0);if(l.c<=0)t.items.splice(t.items.indexOf(l),1);save();render();doSync()}
+function rmNo(){rmAsk=null;render()}
 function setRef(v){var t=ctk();if(t&&can('po')){t.ref=v;save()}}
 function setNota(v){var t=ctk();if(t&&can('po')){t.nota=v;save()}}
 function setTipo(x){var t=ctk();if(t&&can('po')){t.tipo=x;save();render()}}
-function leaveTk(){cxAsk=false;var t=ctk();if(t&&!t.items.length)S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;save();render();doSync()}
+function leaveTk(){cxAsk=false;rmAsk=null;var t=ctk();if(t&&!t.items.length)S.tickets=S.tickets.filter(function(x){return x.id!==t.id});curTk=null;pcat=null;save();render();doSync()}
 var cxAsk=false;
 function cancelTk(){var t=ctk();if(!t)return;cxAsk=true;render()}
 function doCancel(){var t=ctk();if(!t)return;var m=$('cxm'),p=($('apin')||{}).value||'',nt=(($('cxn')||{}).value||'').trim();if(nt.length<3){m.textContent='Escribe el motivo de la cancelación';return}if(!S.pin||(h(p)!==S.pin&&h(p)!==devH())){m.textContent='Código incorrecto';return}t.cx=1;t.cxm=nt;t.cxby=uname;t.cxf=today();t.cxt=nowt();curTk=null;pcat=null;cxAsk=false;save();render();doSync()}
@@ -378,7 +387,8 @@ function printQueue(){
 function hostOn(){return HOST&&(PM==='rawbt'||PM==='bt')}
 function hostBanner(){if(!hostOn()||!S.jobs.length)return '';return '<div class="card" style="border:2px solid var(--ac)"><b>🖨 '+S.jobs.length+' trabajo(s) por imprimir de otras tablets</b><button class="btn s" onclick="printQueue()">Imprimir ahora</button></div>'}
 function hostBox(){if(PM!=='rawbt'&&PM!=='bt')return '';return '<label style="display:flex;align-items:center;gap:10px;margin-top:12px;font-size:15px;color:var(--tx)"><input type="checkbox" style="width:24px;height:24px;padding:0"'+(HOST?' checked':'')+' onchange="setHost(this.checked)">Esta es la tablet principal: tiene la impresora vinculada e imprime lo que manden las otras</label>'}
-function printCmd(o){if(!o)return;if(PM==='nav')prn(cmdHtml(o));else sendBytes(cmdBytes(o))}
+function printCmd(o){if(!o)return;var op=o.id&&S.tickets.indexOf(o)>=0&&!o.cx;if(op)o.items.forEach(function(l){l.pc=l.c});
+  if(PM==='nav')prn(cmdHtml(o));else sendBytes(cmdBytes(o));if(op){save();render()}}
 function printRes(T){if(!T)return;if(PM==='nav')prn(resHtml(T));else sendBytes(resBytes(T))}
 function printTest(){if(PM==='nav')prn('<div style="text-align:center"><b>El Imperio del Taco</b><br>Prueba de impresión</div><br>');else sendBytes(testBytes())}
 function sendBytes(by){if(PM==='remote')queueJob(by);else sendLocal(by)}
@@ -461,7 +471,7 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab='pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-13 v9',LASTERR='';
+var APPV='2026-10-13 v10',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
   return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
