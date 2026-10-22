@@ -138,7 +138,7 @@ function addMov(tipo){
   var ex=names().filter(function(x){return x.toLowerCase()===p.toLowerCase()})[0];if(ex)p=ex;
   S.movs.push({id:Date.now(),f:$('f').value||today(),t:nowt(),p:p,tipo:tipo,c:c,u:$('u').value,nt:$('nt').value.trim()});
   save();render();$('rm').textContent='✓ Guardado: '+(tipo==='entrada'?'entrada':'salida')+' de '+c+' '+p}
-function delMov(id){S.movs=S.movs.filter(function(m){return m.id!==id});save();render()}
+function delMov(id){if(role!=='admin')return;var k='m'+id;if(cf!==k){cf=k;render();return}cf='';S.movs=S.movs.filter(function(m){return m.id!==id});save();render()}
 
 /* ---------- 2 Historial ---------- */
 function vHis(){
@@ -150,7 +150,7 @@ function vHis(){
 function movTable(l){
   if(!l.length)return '<p class="mu">Sin movimientos.</p>';
   return '<div class="sc"><table><tr><th>Fecha</th><th>Producto</th><th>Tipo</th><th>Cant.</th><th></th></tr>'+l.map(function(m){
-    return '<tr><td>'+m.f.slice(5)+'<br><span class="mu">'+m.t+'</span></td><td>'+esc(m.p)+(m.nt?'<br><span class="mu">'+esc(m.nt)+'</span>':'')+'</td><td class="'+(m.tipo==='entrada'?'in':'out')+'">'+(m.tipo==='entrada'?'Entrada':'Salida')+'</td><td>'+m.c+' '+esc(m.u)+'</td><td><button class="btn x" onclick="delMov('+m.id+')">✕</button></td></tr>'}).join('')+'</table></div>'}
+    return '<tr><td>'+m.f.slice(5)+'<br><span class="mu">'+m.t+'</span></td><td>'+esc(m.p)+(m.nt?'<br><span class="mu">'+esc(m.nt)+'</span>':'')+'</td><td class="'+(m.tipo==='entrada'?'in':'out')+'">'+(m.tipo==='entrada'?'Entrada':'Salida')+'</td><td>'+m.c+' '+esc(m.u)+'</td><td><button class="btn x" onclick="delMov('+m.id+')">'+(cf==='m'+m.id?'¿Seguro?':'🗑')+'</button></td></tr>'}).join('')+'</table></div>'}
 
 /* ---------- 3 Movimientos ---------- */
 function vMov(){
@@ -279,7 +279,8 @@ function vPos(){
 function openTks(){return S.tickets.filter(function(t){return !t.cx})}
 function ctk(){if(!curTk)return null;return S.tickets.filter(function(x){return x.id===curTk.id&&!x.cx})[0]||null}
 function catOf(p){return (p.cat||'').trim()||'Otros'}
-function cats(){var m={},o=[];S.prods.forEach(function(p){var c=catOf(p);if(!m[c]){m[c]={n:c,k:0};o.push(m[c])}m[c].k++});return o}
+function vis(p){return !p.hid||role==='admin'}
+function cats(){var m={},o=[];S.prods.forEach(function(p){if(!vis(p))return;var c=catOf(p);if(!m[c]){m[c]={n:c,k:0};o.push(m[c])}m[c].k++});return o}
 function catList(){return '<datalist id="dcat">'+cats().map(function(c){return '<option value="'+esc(c.n)+'">'}).join('')+'</datalist>'}
 function setCat(i,v){S.prods[i].cat=(v||'').trim();save();render()}
 function tkTot(t){return n(t.items.reduce(function(a,l){return a+l.c*l.pr},0))}
@@ -302,7 +303,7 @@ function vTicket(){
   if(!co)left='<p class="mu">Tu usuario no puede crear ni modificar órdenes: aquí solo puedes ver el ticket'+(cc?' y cobrarlo':'')+'.</p>';
   else if(!S.prods.length)left='<p class="mu">Aún no hay productos. El administrador debe agregarlos en ⚙ Ajustes. Si ya los agregó, toca la línea ☁ de arriba para sincronizar.</p>';
   else if(pcat===null)left='<b>Categorías</b><div class="pg" style="margin-top:8px">'+cats().map(function(c,i){return '<button class="pb" onclick="selCat('+i+')"><b>'+esc(c.n)+'</b><br><span class="mu">'+c.k+' productos</span></button>'}).join('')+'</div>';
-  else left='<button class="btn o" style="margin:0 0 10px" onclick="pcat=null;render()">← Categorías</button><b>'+esc(pcat)+'</b><div class="pg" style="margin-top:8px">'+S.prods.map(function(p,i){return catOf(p)===pcat?'<button class="pb" onclick="addC('+i+')"><b>'+esc(p.n)+'</b><br>'+money(p.pr)+'</button>':''}).join('')+'</div>';
+  else left='<button class="btn o" style="margin:0 0 10px" onclick="pcat=null;render()">← Categorías</button><b>'+esc(pcat)+'</b><div class="pg" style="margin-top:8px">'+S.prods.map(function(p,i){return catOf(p)===pcat&&vis(p)?'<button class="pb"'+(p.hid?' style="opacity:.55"':'')+' onclick="addC('+i+')"><b>'+esc(p.n)+(p.hid?' 🙈':'')+'</b><br>'+money(p.pr)+'</button>':''}).join('')+'</div>';
   var ch=t.items.length?t.items.map(function(l,i){return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+esc(l.n)+'<br><span class="mu">'+money(l.pr)+((l.pc||0)>0?' · 🔒 '+l.pc+' enviado'+(l.pc>1?'s':'')+' a cocina':'')+'</span></div>'+(co?'<div class="q" style="flex:none"><button onclick="qC('+i+',-1)">−</button><b>'+l.c+'</b><button onclick="qC('+i+',1)">＋</button></div>':'<div style="flex:none"><b>× '+l.c+'</b></div>')+'<div style="text-align:right;flex:none;min-width:70px"><b>'+money(l.c*l.pr)+'</b></div></div>'}).join(''):'<p class="mu">'+(co?'Elige una categoría y toca un producto para agregarlo.':'El ticket no tiene productos.')+'</p>';
   if(rmAsk&&rmAsk.id===t.id)ch+='<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Quitar «'+esc(rmAsk.n)+'»</b><p class="mu">Ya se mandó a cocina. Para quitarlo necesitas el código del administrador.</p><input id="rmp" type="text" class="pw" autocomplete="off" inputmode="numeric" placeholder="PIN del administrador"><div class="msg" id="rmm"></div><button class="btn" style="background:var(--r)" onclick="rmOk()">Quitar 1</button><button class="btn o" onclick="rmNo()">Cancelar</button></div>';
   var info=co?otypeHtml():'<div class="mu" style="margin:8px 0">'+tl(t.tipo)+(t.ref?' · '+esc(refLabel(t.tipo))+': '+esc(t.ref):'')+(t.nota?'<br>Nota: '+esc(t.nota):'')+'</div>';
@@ -311,7 +312,7 @@ function vTicket(){
   (co?'<button class="btn'+(cc?'':' s')+'" onclick="printCmd(ctk())"'+(tot>0?'':' disabled')+'>🖨 Comanda a cocina</button>':'')+
   '<button class="btn o" onclick="leaveTk()">'+(co?'Guardar y dejar abierto':'← Volver a la lista')+'</button>'+
   (isDev&&t.mesero==='Developer'?'<button class="btn o" onclick="devDelTk()">🗑 Eliminar ticket (Developer)</button>':'')+'<button class="btn o" onclick="cancelTk()">Cancelar ticket</button>'+(cxAsk?'<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Cancelar ticket</b><input id="cxn" placeholder="Motivo de la cancelación (obligatorio)" style="margin-top:6px"><b style="display:block;margin-top:8px">Código del administrador</b><input id="apin" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="PIN del administrador" style="margin-top:6px"><div class="msg" id="cxm"></div><button class="btn" style="background:var(--r)" onclick="doCancel()">Confirmar cancelación</button><button class="btn o" onclick="cxAsk=false;render()">No cancelar</button></div>':'')+'</div></div>'}
-function addC(i){var t=ctk(),p=S.prods[i];if(!t||!p||!can('po'))return;var x=t.items.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else t.items.push({n:p.n,pr:p.pr,c:1});save();render()}
+function addC(i){var t=ctk(),p=S.prods[i];if(!t||!p||!can('po')||!vis(p))return;var x=t.items.filter(function(l){return l.n===p.n&&l.pr===p.pr})[0];if(x)x.c++;else t.items.push({n:p.n,pr:p.pr,c:1});save();render()}
 var rmAsk=null;
 function qC(i,d){var t=ctk();if(!t||!t.items[i]||!can('po'))return;var l=t.items[i];
   if(d<0&&(l.pc||0)>0&&l.c+d<l.pc){rmAsk={id:t.id,i:i,n:l.n};render();return}
@@ -503,7 +504,7 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab=role==='admin'&&!(isDev&&devView==='tabs')?'menu':'pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-16 v16',LASTERR='';
+var APPV='2026-10-22 v17',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
   return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
@@ -574,7 +575,9 @@ function ordList(){
   if(!OL.length)return '<p class="mu">Sin órdenes.</p>';
   var tot=0;OL.forEach(function(o){tot+=o.tot});
   return '<div class="sum"><div><b>'+OL.length+'</b>órdenes</div><div><b>'+money(tot)+'</b>total</div></div>'+OL.map(function(o,i){
-    return '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+o.tk+' · '+tl(o.tipo)+'</b><b>'+money(o.tot)+'</b></div><div class="mu">'+o.f.slice(5)+' '+o.t+(o.ref?' · '+esc(o.ref):'')+(o.mesero?' · '+esc(o.mesero):'')+' · '+pl(o.pago)+'</div><div>'+o.items.map(function(x){return x.c+' x '+esc(x.n)}).join(', ')+'</div>'+(o.nota?'<div class="mu">Nota: '+esc(o.nota)+'</div>':'')+'<button class="btn x" style="margin-top:6px" onclick="printCmd(OL['+i+'])">🖨 Comanda</button>'+(can('pc')?' <button class="btn x" style="margin-top:6px" onclick="editRef('+i+')">✏ Cambiar '+(o.tipo==='aqui'?'mesa':'dato')+'</button>':'')+'</div>'}).join('')}
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;gap:8px"><b>#'+o.tk+' · '+tl(o.tipo)+'</b><b>'+money(o.tot)+'</b></div><div class="mu">'+o.f.slice(5)+' '+o.t+(o.ref?' · '+esc(o.ref):'')+(o.mesero?' · '+esc(o.mesero):'')+' · '+pl(o.pago)+'</div><div>'+o.items.map(function(x){return x.c+' x '+esc(x.n)}).join(', ')+'</div>'+(o.nota?'<div class="mu">Nota: '+esc(o.nota)+'</div>':'')+'<button class="btn x" style="margin-top:6px" onclick="printCmd(OL['+i+'])">🖨 Comanda</button>'+(can('pc')?' <button class="btn x" style="margin-top:6px" onclick="editRef('+i+')">✏ Cambiar '+(o.tipo==='aqui'?'mesa':'dato')+'</button>':'')+(role==='admin'?' <button class="btn x" style="margin-top:6px;color:var(--r)" onclick="delOrden('+i+')">'+(cf==='o'+o.tk+'_'+o.f?'⚠ ¿Seguro? Toca otra vez':'🗑 Eliminar orden')+'</button>':'')+'</div>'}).join('')}
+function delOrden(i){if(role!=='admin')return;var o=OL[i];if(!o)return;var k='o'+o.tk+'_'+o.f;if(cf!==k){cf=k;render();return}cf='';
+  S.ventas=S.ventas.filter(function(v){return !(v.tk===o.tk&&v.f===o.f)});S.movs=S.movs.filter(function(m){return !(m.auto&&m.tk===o.tk&&m.f===o.f)});save();render();doSync()}
 function vOrd(){
   if(!od)od=today();
   return '<div class="card"><div class="tabs">'+[['day','Día'],['week','Semana'],['month','Mes']].map(function(x){return '<button class="'+(opp===x[0]?'on':'')+'" onclick="opp=\''+x[0]+'\';render()">'+x[1]+'</button>'}).join('')+'</div><input type="date" value="'+od+'" onchange="od=this.value||today();render()"><input style="margin-top:8px" placeholder="Buscar: # de orden, mesa/cliente o mesero" value="'+esc(oq)+'" oninput="oq=this.value;$(\'ol\').innerHTML=ordList()"><div id="ol" style="margin-top:8px">'+ordList()+'</div></div>'+vCanc()}
@@ -660,7 +663,7 @@ function doPay(){
   var T=curT();if(!T){pay=null;render();return}
   var f=today(),hh=nowt(),ref=(t.ref||'').trim(),nota=(t.nota||'').trim(),mes=t.mesero||uname;
   t.items.forEach(function(l){S.ventas.push({id:nid(),f:f,t:hh,p:l.n,c:l.c,pr:l.pr,tk:t.tk,pago:payM,turno:T.id,tipo:t.tipo,ref:ref,mesero:mes,nota:nota})});
-  try{saleMovs(t.items,t.tk,T,mes,f,hh).forEach(function(m){S.movs.push(m)});if(saleMovs.bad&&saleMovs.bad.length)toast('Revisa las recetas: no se pudo descontar '+saleMovs.bad.join(', '))}catch(e){}
+  try{saleMovs(t.items,t.tk,T,mes,f,hh,t.tipo).forEach(function(m){S.movs.push(m)});if(saleMovs.bad&&saleMovs.bad.length)toast('Revisa las recetas: no se pudo descontar '+saleMovs.bad.join(', '))}catch(e){}
   rc={tipo:t.tipo,ref:ref,mesero:mes,nota:nota,tk:t.tk,f:f,t:hh,items:t.items.map(function(l){return {n:l.n,c:l.c,pr:l.pr}}),tot:tot,pago:payM,recv:r,cambio:n(r-tot)};
   S.tickets=S.tickets.filter(function(x){return x.id!==t.id});
   curTk=null;pcat=null;pay=null;save();render();doSync()}
@@ -702,9 +705,9 @@ function rxExpand(nm,q,u,acc,dep){
     if(yb&&qb&&yb.d===qb.d&&yb.v>0){var f=qb.v/yb.v;(pp.ing||[]).forEach(function(g){if(g.n&&g.q>0)rxExpand(g.n,g.q*f,g.u,acc,dep+1)})}else acc.bad[nm]=1;return}
   var a=acc.m[k]=acc.m[k]||{n:nm,l:[]};a.l.push([q,u])}
 /* salidas de inventario que genera una venta (una por ingrediente) */
-function saleMovs(items,tk,T,mes,f,hh){
+function saleMovs(items,tk,T,mes,f,hh,tipo){tipo=tipo||'aqui';
   var acc={m:{},bad:{}},out=[];
-  items.forEach(function(l){var p=S.prods.filter(function(x){return x.n===l.n})[0];if(!p||!p.rec)return;p.rec.forEach(function(g){if(g.n&&g.q>0)rxExpand(g.n,g.q*l.c,g.u,acc,0)})});
+  items.forEach(function(l){var p=S.prods.filter(function(x){return x.n===l.n})[0];if(!p||!p.rec)return;p.rec.forEach(function(g){if(!g.n||!(g.q>0))return;if(g.w==='a'&&tipo!=='aqui')return;if(g.w==='l'&&tipo==='aqui')return;rxExpand(g.n,g.q*l.c,g.u,acc,0)})});
   Object.keys(acc.m).forEach(function(k){var a=acc.m[k],nm=rxCanon(a.n),iu=rxInvUnit(nm)||RXU[a.l[0][1]]||'unidades',tot=0;
     a.l.forEach(function(x){var c=rxConv(x[0],x[1],iu);if(c===null)acc.bad[a.n]=1;else tot+=c});
     if(tot>0)out.push({id:nid(),f:f,t:hh,p:nm,tipo:'salida',c:Math.round(tot*10000)/10000,u:iu,nt:'Venta #'+tk,auto:1,tk:tk,vt:T.id,by:mes})});
@@ -715,11 +718,11 @@ function rxInfo(x){if(!x.n)return '';var k=rxKey(x.n);if(rxPreps().some(function
   return rxConv(1,x.u,iu)===null?'⚠ El inventario está en «'+iu+'» y no se puede convertir a '+x.u:'Inventario en '+iu}
 function rxArr(mk){if(rxSel!==null){var p=S.prods[rxSel];if(!p)return null;if(!p.rec&&mk)p.rec=[];return p.rec}var pp=rxPreps()[rxPrep];return pp?pp.ing:null}
 function rxAdd(){var a=rxArr(1);if(!a)return;a.push({n:'',q:0,u:'g'});save();render()}
-function rxSet(j,k,v){var a=rxArr(),x=a&&a[j];if(!x)return;if(k==='q')x.q=parseFloat(v)||0;else if(k==='u')x.u=v;else x.n=String(v).trim();save()}
+function rxSet(j,k,v){var a=rxArr(),x=a&&a[j];if(!x)return;if(k==='q')x.q=parseFloat(v)||0;else if(k==='u')x.u=v;else if(k==='w'){if(v==='t')delete x.w;else x.w=v}else x.n=String(v).trim();save()}
 function rxDel(j){var a=rxArr();if(!a)return;a.splice(j,1);save();render()}
 function rxRows(){
   var a=rxArr()||[];
-  return (a.length?'<div class="mu" style="display:flex;gap:8px;padding:0 0 4px"><span style="flex:3">Ingrediente</span><span style="flex:1.3">Cantidad</span><span style="flex:1.2">Unidad</span><span style="width:34px"></span></div>':'')+a.map(function(x,j){return '<div style="padding:8px 0;border-bottom:1px solid var(--bd)"><div class="row" style="align-items:center"><input list="dri" value="'+esc(x.n)+'" placeholder="Ingrediente" onchange="rxSet('+j+',\'n\',this.value);render()" style="flex:3"><input type="number" inputmode="decimal" step="any" min="0" value="'+(x.q||'')+'" placeholder="Cant." onchange="rxSet('+j+',\'q\',this.value)" style="flex:1.3"><select style="flex:1.2" onchange="rxSet('+j+',\'u\',this.value);render()">'+['g|g','oz|oz','ml|ml','pz|pz'].map(function(o){var p=o.split('|');return '<option value="'+p[0]+'"'+(x.u===p[0]?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select><button class="btn x" style="flex:none" onclick="rxDel('+j+')">✕</button></div><div class="mu" style="margin-top:3px">'+esc(rxInfo(x))+'</div></div>'}).join('')+(a.length?'':'<p class="mu">Aún no tiene ingredientes.</p>')}
+  return (a.length?'<div class="mu" style="display:flex;gap:8px;padding:0 0 4px"><span style="flex:3">Ingrediente</span><span style="flex:1.3">Cantidad</span><span style="flex:1.2">Unidad</span><span style="width:34px"></span></div>':'')+a.map(function(x,j){return '<div style="padding:8px 0;border-bottom:1px solid var(--bd)"><div class="row" style="align-items:center"><input list="dri" value="'+esc(x.n)+'" placeholder="Ingrediente" onchange="rxSet('+j+',\'n\',this.value);render()" style="flex:3"><input type="number" inputmode="decimal" step="any" min="0" value="'+(x.q||'')+'" placeholder="Cant." onchange="rxSet('+j+',\'q\',this.value)" style="flex:1.3"><select style="flex:1.2" onchange="rxSet('+j+',\'u\',this.value);render()">'+['g|g','oz|oz','ml|ml','pz|pz'].map(function(o){var p=o.split('|');return '<option value="'+p[0]+'"'+(x.u===p[0]?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select><button class="btn x" style="flex:none" onclick="rxDel('+j+')">✕</button></div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap"><span class="mu">'+esc(rxInfo(x))+'</span>'+(rxSel!==null?'<select style="width:auto;max-width:100%;padding:5px 8px;font-size:13px" onchange="rxSet('+j+',\'w\',this.value)"><option value="t"'+(!x.w?' selected':'')+'>Se usa en todas las órdenes</option><option value="a"'+(x.w==='a'?' selected':'')+'>Solo comer aquí</option><option value="l"'+(x.w==='l'?' selected':'')+'>Solo para llevar, recoger o domicilio</option></select>':'')+'</div></div>'}).join('')+(a.length?'':'<p class="mu">Aún no tiene ingredientes.</p>')}
 function rxEditPrep(i){
   var p=rxPreps()[i];
   return '<div class="card"><b>Preparación</b><p class="mu">Una receta base que se usa dentro de otras (ej. el chimol). Cuando un producto lleva «'+esc(p.n)+'», se descuentan sus ingredientes en proporción a lo que rinde.</p><label>Nombre (igual a como aparece en la receta del producto)</label><input value="'+esc(p.n)+'" onchange="rxPN(this.value)"><div class="row"><div><label>Rinde (cantidad total)</label><input type="number" inputmode="decimal" step="any" value="'+(p.y||'')+'" onchange="rxPY(this.value)"></div><div><label>Unidad</label><select onchange="rxPU(this.value)">'+['g|g','ml|ml','oz|oz','pz|pz'].map(function(o){var q=o.split('|');return '<option value="'+q[0]+'"'+(p.u===q[0]?' selected':'')+'>'+q[1]+'</option>'}).join('')+'</select></div></div><b style="display:block;margin-top:12px">Ingredientes de toda la preparación</b>'+rxRows()+'<button class="btn s" onclick="rxAdd()">＋ Agregar ingrediente</button><button class="btn o" onclick="rxDelPrep()">🗑 Borrar esta preparación</button></div>'}
@@ -756,16 +759,17 @@ function rxCreate(){
   if(!nm){m.textContent='Escribe el nombre del producto';return}
   if(!(pr>=0)){m.textContent='Escribe el precio';return}
   S.prods.push({id:nid(),n:nm,pr:pr,cat:ct,rec:[]});rxSel=S.prods.length-1;rxNew=false;save();render()}
+function rxHide(i){var p=S.prods[i];if(!p)return;if(p.hid)delete p.hid;else p.hid=true;save();render()}
 function rxDelProd(i){var p=S.prods[i];if(!p)return;if(!confirm('¿Quitar «'+p.n+'» del menú? También se borra su receta.'))return;S.prods.splice(i,1);rxSel=null;save();render()}
 function rxBack(lbl,fn){return '<button class="btn o" style="margin-top:0;width:auto;padding:9px 16px" onclick="'+fn+';render()">← '+lbl+'</button>'}
 function rxEditProd(i){
   var p=S.prods[i];
-  return '<div class="card"><b>Producto</b><label>Nombre</label><input value="'+esc(p.n)+'" onchange="rxFld('+i+',\'n\',this.value)"><div class="row"><div><label>Precio ($)</label><input type="number" inputmode="decimal" step="any" min="0" value="'+p.pr+'" onchange="rxFld('+i+',\'pr\',this.value)"></div><div><label>Categoría</label><input list="dcat" value="'+esc(p.cat||'')+'" placeholder="Ej: Taco" onchange="rxFld('+i+',\'cat\',this.value)"></div></div></div>'+
-  '<div class="card"><b>Receta</b><p class="mu">Lo que se descuenta del inventario por <b>cada unidad vendida</b>, al cobrar. Si la dejas vacía, este producto no descuenta nada.<br>Unidades: <b>g</b> gramos · <b>oz</b> onzas líquidas · <b>ml</b> mililitros · <b>pz</b> piezas.</p>'+rxRows()+'<button class="btn s" onclick="rxAdd()">＋ Agregar ingrediente</button></div>'+
+  return '<div class="card"><b>Producto</b><label>Nombre</label><input value="'+esc(p.n)+'" onchange="rxFld('+i+',\'n\',this.value)"><div class="row"><div><label>Precio ($)</label><input type="number" inputmode="decimal" step="any" min="0" value="'+p.pr+'" onchange="rxFld('+i+',\'pr\',this.value)"></div><div><label>Categoría</label><input list="dcat" value="'+esc(p.cat||'')+'" placeholder="Ej: Taco" onchange="rxFld('+i+',\'cat\',this.value)"></div></div><button class="btn o" onclick="rxHide('+i+')">'+(p.hid?'👁 Mostrar en el menú de cobro':'🙈 Ocultar del menú de cobro')+'</button><p class="mu" style="margin:6px 0 0">'+(p.hid?'Está oculto: los meseros y cajeros no lo ven al crear órdenes. El administrador sí.':'Si lo ocultas, los meseros y cajeros dejan de verlo al crear órdenes. El administrador sí lo ve.')+'</p></div>'+
+  '<div class="card"><b>Receta</b><p class="mu">Lo que se descuenta del inventario por <b>cada unidad vendida</b>, al cobrar. Si la dejas vacía, este producto no descuenta nada.<br>Unidades: <b>g</b> gramos · <b>oz</b> onzas líquidas · <b>ml</b> mililitros · <b>pz</b> piezas.<br>En cada ingrediente puedes elegir si se usa en <b>todas las órdenes</b>, <b>solo comer aquí</b> (ej. plato) o <b>solo para llevar</b> (ej. bolsa, plástico, envase).</p>'+rxRows()+'<button class="btn s" onclick="rxAdd()">＋ Agregar ingrediente</button></div>'+
   '<button class="btn o" style="color:var(--r)" onclick="rxDelProd('+i+')">🗑 Quitar este producto del menú</button>'}
 function rxList(){
   var cats={},ord=[];S.prods.forEach(function(p,i){var c=catOf(p);if(!cats[c]){cats[c]=[];ord.push(c)}cats[c].push(i)});
-  return ord.map(function(c){return '<div class="rxcat">'+esc(c)+'<span>'+cats[c].length+'</span></div>'+cats[c].map(function(i){var p=S.prods[i],k=(p.rec||[]).filter(rxOkL).length;return '<button class="rxrow" onclick="rxSel='+i+';render()"><div style="min-width:0"><b>'+esc(p.n)+'</b><div class="mu">'+(k?k+' ingrediente'+(k>1?'s':''):'<span class="rxno">Sin receta</span>')+'</div></div><div class="rxpr">'+money(p.pr)+'<span>›</span></div></button>'}).join('')}).join('')}
+  return ord.map(function(c){return '<div class="rxcat">'+esc(c)+'<span>'+cats[c].length+'</span></div>'+cats[c].map(function(i){var p=S.prods[i],k=(p.rec||[]).filter(rxOkL).length;return '<button class="rxrow" onclick="rxSel='+i+';render()"><div style="min-width:0"><b>'+esc(p.n)+'</b>'+(p.hid?' <span class="mu">🙈 oculto</span>':'')+'<div class="mu">'+(k?k+' ingrediente'+(k>1?'s':''):'<span class="rxno">Sin receta</span>')+'</div></div><div class="rxpr">'+money(p.pr)+'<span>›</span></div></button>'}).join('')}).join('')}
 function rxNewForm(){
   return '<div class="card"><b>Nuevo producto</b>'+catList()+'<label>Nombre</label><input id="npn" placeholder="Ej: Tacos de pastor"><div class="row"><div><label>Precio ($)</label><input id="npp" type="number" inputmode="decimal" step="any" min="0" placeholder="0.00"></div><div><label>Categoría</label><input id="npc" list="dcat" placeholder="Ej: Taco"></div></div><div class="msg" id="npm"></div><button class="btn s" onclick="rxCreate()">Crear y agregar receta →</button><button class="btn o" onclick="rxNew=false;render()">Cancelar</button></div>'}
 function vRec(){
