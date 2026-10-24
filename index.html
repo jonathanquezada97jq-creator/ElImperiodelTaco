@@ -95,13 +95,13 @@ var SESS_MAX=3*3600*1000,SESS_T=0;
 var SESS_C=-1;
 function saveSess(f){if(!auth)return;var n=Date.now(),cc=curTk?curTk.id:0;if(!f&&cc===SESS_C&&n-SESS_T<4000)return;SESS_T=n;SESS_C=cc;try{localStorage.setItem('inv_sess',JSON.stringify({role:role,uname:uname,uid:uid,dev:isDev?1:0,tab:tab,cur:curTk?curTk.id:0,ts:n}))}catch(e){}}
 function clearSess(){try{localStorage.removeItem('inv_sess')}catch(e){}}
-function restoreSess(){try{var o=JSON.parse(localStorage.getItem('inv_sess')||'null');if(!o||!S.pin||Date.now()-o.ts>SESS_MAX)return false;
+function restoreSess(){try{var o=JSON.parse(localStorage.getItem('inv_sess')||'null');if(!o||!S.pin||Date.now()-o.ts>((o.role==='admin'||o.dev)?30*60000:SESS_MAX))return false;
   if(o.dev){if(!(S.cfg.dpin||true))return false;role='admin';uname='Developer';isDev=true}
   else if(o.role==='admin'){role='admin';uname='Administrador'}
   else{var u=S.users.filter(function(x){return x.id===o.uid})[0];if(!u)return false;role='cajero';uname=u.n;uid=u.id}
   auth=true;if(o.tab)tab=o.tab;if(o.cur)curTk=S.tickets.filter(function(x){return x.id===o.cur&&!x.cx})[0]||null;return true}catch(e){return false}}
 if(document.addEventListener){['pointerdown','keydown'].forEach(function(ev){document.addEventListener(ev,function(){saveSess(false)},true)})}
-function logout(){auth=false;isDev=false;role='';clearSess();lockView()}
+function logout(){auth=false;isDev=false;role='';showHid=false;clearSess();lockView()}
 function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){return m.p===v}).pop();if(l)$('u').value=l.u}
 
 /* ---------- Estructura ---------- */
@@ -166,9 +166,10 @@ function stockData(){
     S.movs.forEach(function(m){if(m.p===p){u=m.u;m.tipo==='entrada'?e+=m.c:s+=m.c}});
     var st=n(e-s),r=e>0?st/e:0,est=(st<=0||r<0.2)?['Bajo stock','var(--r)']:(r<0.5?['Mitad de stock','var(--y)']:['Buen stock','var(--g)']);
     return {p:p,u:u,e:n(e),s:n(s),st:st,est:est}})}
+function delItem(i){if(role!=='admin')return;var d=stockData()[i];if(!d)return;var k='i'+d.p;if(cf!==k){cf=k;render();return}cf='';S.movs=S.movs.filter(function(m){return m.p!==d.p});save();render()}
 function vStk(){
   var d=stockData();
-  return '<div class="card">'+(d.length?d.map(function(x){return '<div style="padding:9px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+esc(x.p)+'</b><span class="pill" style="background:'+x.est[1]+'">'+x.est[0]+'</span></div><div class="mu">Total entradas: '+x.e+' '+esc(x.u)+' · Total salidas: '+x.s+' '+esc(x.u)+'</div><div>Stock actual: <b>'+x.st+' '+esc(x.u)+'</b></div></div>'}).join(''):'<p class="mu">Aún no hay productos. Ve a Registro.</p>')+
+  return '<div class="card">'+(d.length?d.map(function(x,ix){return '<div style="padding:9px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+esc(x.p)+'</b><span class="pill" style="background:'+x.est[1]+'">'+x.est[0]+'</span></div><div class="mu">Total entradas: '+x.e+' '+esc(x.u)+' · Total salidas: '+x.s+' '+esc(x.u)+'</div><div>Stock actual: <b>'+x.st+' '+esc(x.u)+'</b></div>'+(role==='admin'?'<button class="btn x" style="margin-top:8px;color:var(--r)" onclick="delItem('+ix+')">'+(cf==='i'+x.p?'⚠ Se borran todas sus entradas y salidas. Toca otra vez para confirmar':'🗑 Eliminar del inventario')+'</button>':'')+'</div>'}).join(''):'<p class="mu">Aún no hay productos. Ve a Registro.</p>')+
   '<p class="mu">🟢 Buen stock: más de 50% de lo que ha entrado · 🟡 Mitad: 20%–50% · 🔴 Bajo: menos de 20% o agotado.</p></div>'}
 
 /* ---------- Venta del día ---------- */
@@ -220,7 +221,7 @@ function exportVen(){saveXlsx(wbVen(),'ventas_'+today()+'.xlsx')}
 
 
 /* ====== CONFIGURACIÓN: pega aquí la URL de tu Apps Script ====== */
-var API="https://script.google.com/macros/s/AKfycbwtKg6L6nQaoJkFL3tBL_CaNTewyU36PF38UBYRjZBvmdpzATGzumsurJdbtG0T7Tdf/exec";
+var API='PEGA_AQUI_LA_URL_DE_TU_SCRIPT';
 try{if(API.indexOf('http')===0)localStorage.setItem('inv_api',API);else{var _a=localStorage.getItem('inv_api');if(_a)API=_a}}catch(e){}
 function apiOk(){return API.indexOf('http')===0}
 function saveApi(){var v=($('au').value||'').trim();if(v.indexOf('https://script.google.com/')!==0){$('gm').textContent='Esa no parece la URL del script (debe empezar con https://script.google.com/)';return}API=v;try{localStorage.setItem('inv_api',v)}catch(e){}init()}
@@ -279,7 +280,8 @@ function vPos(){
 function openTks(){return S.tickets.filter(function(t){return !t.cx})}
 function ctk(){if(!curTk)return null;return S.tickets.filter(function(x){return x.id===curTk.id&&!x.cx})[0]||null}
 function catOf(p){return (p.cat||'').trim()||'Otros'}
-function vis(p){return !p.hid||role==='admin'}
+var showHid=false;
+function vis(p){return !p.hid||(role==='admin'&&showHid)}
 function cats(){var m={},o=[];S.prods.forEach(function(p){if(!vis(p))return;var c=catOf(p);if(!m[c]){m[c]={n:c,k:0};o.push(m[c])}m[c].k++});return o}
 function catList(){return '<datalist id="dcat">'+cats().map(function(c){return '<option value="'+esc(c.n)+'">'}).join('')+'</datalist>'}
 function setCat(i,v){S.prods[i].cat=(v||'').trim();save();render()}
@@ -304,6 +306,7 @@ function vTicket(){
   else if(!S.prods.length)left='<p class="mu">Aún no hay productos. El administrador debe agregarlos en ⚙ Ajustes. Si ya los agregó, toca la línea ☁ de arriba para sincronizar.</p>';
   else if(pcat===null)left='<b>Categorías</b><div class="pg" style="margin-top:8px">'+cats().map(function(c,i){return '<button class="pb" onclick="selCat('+i+')"><b>'+esc(c.n)+'</b><br><span class="mu">'+c.k+' productos</span></button>'}).join('')+'</div>';
   else left='<button class="btn o" style="margin:0 0 10px" onclick="pcat=null;render()">← Categorías</button><b>'+esc(pcat)+'</b><div class="pg" style="margin-top:8px">'+S.prods.map(function(p,i){return catOf(p)===pcat&&vis(p)?'<button class="pb"'+(p.hid?' style="opacity:.55"':'')+' onclick="addC('+i+')"><b>'+esc(p.n)+(p.hid?' 🙈':'')+'</b><br>'+money(p.pr)+'</button>':''}).join('')+'</div>';
+  if(co&&role==='admin'&&S.prods.some(function(p){return p.hid}))left+='<button class="btn o" style="margin-top:10px" onclick="showHid=!showHid;pcat=null;render()">'+(showHid?'🙈 Volver a ocultar los productos ocultos':'👁 Mostrar productos ocultos ('+S.prods.filter(function(p){return p.hid}).length+')')+'</button>';
   var ch=t.items.length?t.items.map(function(l,i){return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+esc(l.n)+'<br><span class="mu">'+money(l.pr)+((l.pc||0)>0?' · 🔒 '+l.pc+' enviado'+(l.pc>1?'s':'')+' a cocina':'')+'</span></div>'+(co?'<div class="q" style="flex:none"><button onclick="qC('+i+',-1)">−</button><b>'+l.c+'</b><button onclick="qC('+i+',1)">＋</button></div>':'<div style="flex:none"><b>× '+l.c+'</b></div>')+'<div style="text-align:right;flex:none;min-width:70px"><b>'+money(l.c*l.pr)+'</b></div></div>'}).join(''):'<p class="mu">'+(co?'Elige una categoría y toca un producto para agregarlo.':'El ticket no tiene productos.')+'</p>';
   if(rmAsk&&rmAsk.id===t.id)ch+='<div style="margin-top:10px;padding:10px;border:1px solid var(--r);border-radius:8px"><b>Quitar «'+esc(rmAsk.n)+'»</b><p class="mu">Ya se mandó a cocina. Para quitarlo necesitas el código del administrador.</p><input id="rmp" type="text" class="pw" autocomplete="off" inputmode="numeric" placeholder="PIN del administrador"><div class="msg" id="rmm"></div><button class="btn" style="background:var(--r)" onclick="rmOk()">Quitar 1</button><button class="btn o" onclick="rmNo()">Cancelar</button></div>';
   var info=co?otypeHtml():'<div class="mu" style="margin:8px 0">'+tl(t.tipo)+(t.ref?' · '+esc(refLabel(t.tipo))+': '+esc(t.ref):'')+(t.nota?'<br>Nota: '+esc(t.nota):'')+'</div>';
@@ -491,7 +494,7 @@ function restore(){S.movs=BK.movs||[];S.ventas=BK.ventas||[];S.prods=BK.prods||[
 
 /* --- Acceso por rol --- */
 function enter(){
-  var p=$('pin').value;isDev=false;
+  var p=$('pin').value;isDev=false;showHid=false;
   if(!S.pin){
     if(p.length<4){$('lm').textContent='Mínimo 4 dígitos';return}
     if(h(p)===devH()){$('lm').textContent='Ese PIN no está disponible';return}
@@ -504,7 +507,7 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab=role==='admin'&&!(isDev&&devView==='tabs')?'menu':'pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-22 v17',LASTERR='';
+var APPV='2026-10-24 v18',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
   return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
@@ -764,7 +767,7 @@ function rxDelProd(i){var p=S.prods[i];if(!p)return;if(!confirm('¿Quitar «'+p.
 function rxBack(lbl,fn){return '<button class="btn o" style="margin-top:0;width:auto;padding:9px 16px" onclick="'+fn+';render()">← '+lbl+'</button>'}
 function rxEditProd(i){
   var p=S.prods[i];
-  return '<div class="card"><b>Producto</b><label>Nombre</label><input value="'+esc(p.n)+'" onchange="rxFld('+i+',\'n\',this.value)"><div class="row"><div><label>Precio ($)</label><input type="number" inputmode="decimal" step="any" min="0" value="'+p.pr+'" onchange="rxFld('+i+',\'pr\',this.value)"></div><div><label>Categoría</label><input list="dcat" value="'+esc(p.cat||'')+'" placeholder="Ej: Taco" onchange="rxFld('+i+',\'cat\',this.value)"></div></div><button class="btn o" onclick="rxHide('+i+')">'+(p.hid?'👁 Mostrar en el menú de cobro':'🙈 Ocultar del menú de cobro')+'</button><p class="mu" style="margin:6px 0 0">'+(p.hid?'Está oculto: los meseros y cajeros no lo ven al crear órdenes. El administrador sí.':'Si lo ocultas, los meseros y cajeros dejan de verlo al crear órdenes. El administrador sí lo ve.')+'</p></div>'+
+  return '<div class="card"><b>Producto</b><label>Nombre</label><input value="'+esc(p.n)+'" onchange="rxFld('+i+',\'n\',this.value)"><div class="row"><div><label>Precio ($)</label><input type="number" inputmode="decimal" step="any" min="0" value="'+p.pr+'" onchange="rxFld('+i+',\'pr\',this.value)"></div><div><label>Categoría</label><input list="dcat" value="'+esc(p.cat||'')+'" placeholder="Ej: Taco" onchange="rxFld('+i+',\'cat\',this.value)"></div></div><button class="btn o" onclick="rxHide('+i+')">'+(p.hid?'👁 Mostrar en el menú de cobro':'🙈 Ocultar del menú de cobro')+'</button><p class="mu" style="margin:6px 0 0">'+(p.hid?'Está oculto: no sale al crear órdenes, para nadie. Si lo necesitas, en Cobrar el administrador puede tocar «Mostrar productos ocultos».':'Si lo ocultas, deja de salir al crear órdenes, para meseros y cajeros. Solo el administrador puede volver a mostrarlo desde aquí.')+'</p></div>'+
   '<div class="card"><b>Receta</b><p class="mu">Lo que se descuenta del inventario por <b>cada unidad vendida</b>, al cobrar. Si la dejas vacía, este producto no descuenta nada.<br>Unidades: <b>g</b> gramos · <b>oz</b> onzas líquidas · <b>ml</b> mililitros · <b>pz</b> piezas.<br>En cada ingrediente puedes elegir si se usa en <b>todas las órdenes</b>, <b>solo comer aquí</b> (ej. plato) o <b>solo para llevar</b> (ej. bolsa, plástico, envase).</p>'+rxRows()+'<button class="btn s" onclick="rxAdd()">＋ Agregar ingrediente</button></div>'+
   '<button class="btn o" style="color:var(--r)" onclick="rxDelProd('+i+')">🗑 Quitar este producto del menú</button>'}
 function rxList(){
