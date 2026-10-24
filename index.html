@@ -221,7 +221,7 @@ function exportVen(){saveXlsx(wbVen(),'ventas_'+today()+'.xlsx')}
 
 
 /* ====== CONFIGURACIÓN: pega aquí la URL de tu Apps Script ====== */
-var "https://script.google.com/macros/s/AKfycbwtKg6L6nQaoJkFL3tBL_CaNTewyU36PF38UBYRjZBvmdpzATGzumsurJdbtG0T7Tdf/exec" ;
+var API='https://script.google.com/macros/s/AKfycbwtKg6L6nQaoJkFL3tBL_CaNTewyU36PF38UBYRjZBvmdpzATGzumsurJdbtG0T7Tdf/exec';
 try{if(API.indexOf('http')===0)localStorage.setItem('inv_api',API);else{var _a=localStorage.getItem('inv_api');if(_a)API=_a}}catch(e){}
 function apiOk(){return API.indexOf('http')===0}
 function saveApi(){var v=($('au').value||'').trim();if(v.indexOf('https://script.google.com/')!==0){$('gm').textContent='Esa no parece la URL del script (debe empezar con https://script.google.com/)';return}API=v;try{localStorage.setItem('inv_api',v)}catch(e){}init()}
