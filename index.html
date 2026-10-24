@@ -221,18 +221,19 @@ function exportVen(){saveXlsx(wbVen(),'ventas_'+today()+'.xlsx')}
 
 
 /* ====== CONFIGURACIÓN: pega aquí la URL de tu Apps Script ====== */
-var API='https://script.google.com/macros/s/AKfycbwtKg6L6nQaoJkFL3tBL_CaNTewyU36PF38UBYRjZBvmdpzATGzumsurJdbtG0T7Tdf/exec';
+var API='https://script.google.com/macros/s/AKfycbzmoISz6zpFlGy1L-tGTAeqtjiHj--Jb836YsyMZFcV21KFNSZxqX_gIMt35BkcxxRS/exec';
 try{if(API.indexOf('http')===0)localStorage.setItem('inv_api',API);else{var _a=localStorage.getItem('inv_api');if(_a)API=_a}}catch(e){}
 function apiOk(){return API.indexOf('http')===0}
 function saveApi(){var v=($('au').value||'').trim();if(v.indexOf('https://script.google.com/')!==0){$('gm').textContent='Esa no parece la URL del script (debe empezar con https://script.google.com/)';return}API=v;try{localStorage.setItem('inv_api',v)}catch(e){}init()}
 try{var _a=localStorage.getItem('inv_api');if(_a&&API.indexOf('PEGA_AQUI')===0)API=_a}catch(e){}   // si no está en el archivo, usa la guardada en este equipo
 var CODE='',pend=false;
-function api(o){o.code=CODE;o.dev=DEV;return fetch(API,{method:'POST',body:JSON.stringify(o)}).then(function(r){return r.json()},function(e){var x=new Error('NET');x.net=1;throw x})}
+function tabName(){try{return localStorage.getItem('inv_name')||''}catch(e){return ''}}
+function api(o){o.code=CODE;o.dev=DEV;o.name=tabName();return fetch(API,{method:'POST',body:JSON.stringify(o)}).then(function(r){return r.json()},function(e){var x=new Error('NET');x.net=1;throw x})}
 function setBk(t){var e=$('bk');if(e)e.textContent=t}
 function apiView(){$('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>Conectar con tu hoja de Google</h1><p class="mu">Pega la URL de tu script (la que termina en /exec). Solo se pide una vez en este equipo.</p><input id="au" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"><div class="msg" id="am"></div><button class="btn" onclick="saveApi()">Guardar y conectar</button></div>'}
 function saveApi(){var u=($('au').value||'').trim();if(u.indexOf('https://script.google.com/')!==0||u.slice(-5)!=='/exec'){$('am').textContent='La URL debe empezar con https://script.google.com/ y terminar en /exec';return}API=u;try{localStorage.setItem('inv_api',u)}catch(e){}init()}
 function gateView(){if(!apiOk()){$('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>Conectar con tu hoja de Google</h1><p class="mu">Pega la URL del script (termina en /exec). Solo se pide una vez en este equipo.</p><input id="au" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"><div class="msg" id="gm"></div><button class="btn" onclick="saveApi()">Guardar</button></div>';return}
-  $('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>Dispositivo no autorizado</h1><p class="mu">Escribe el código de acceso.</p><input id="cd" placeholder="TACO-XXXX-XXXX" autocapitalize="characters" autocomplete="off"><div class="msg" id="gm"></div><button class="btn" onclick="activate()">Activar dispositivo</button></div>'}
+  $('app').innerHTML='<div id="lock" class="card"><div style="text-align:center">'+LOGOL+'</div><h1>Dispositivo no autorizado</h1><p class="mu">Escribe el código de acceso y el nombre de esta tablet.</p><input id="cd" placeholder="Código (ej. TACO001)" autocapitalize="characters" autocomplete="off"><input id="cn" style="margin-top:8px" placeholder="Nombre de esta tablet (ej. Caja, Mesero 1)" autocomplete="off" maxlength="40"><div class="msg" id="gm"></div><button class="btn" onclick="activate()">Activar dispositivo</button></div>'}
 async function activate(){
   var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),m=$('gm');
   if(!c){m.textContent='Escribe el código';return}
@@ -442,8 +443,12 @@ async function btPrint(by){
     }
     for(var k=0;k<by.length;k+=60){var ch=new Uint8Array(by.slice(k,k+60));if(BTc.properties.writeWithoutResponse)await BTc.writeValueWithoutResponse(ch);else await BTc.writeValue(ch);await new Promise(function(r){setTimeout(r,45)})}
   }catch(e){BTc=null;alert('No se pudo imprimir: '+((e&&e.message)||e))}}
+function setTabName(){var v=(($('tn')||{}).value||'').trim(),m=$('tnm');if(!v){m.textContent='Escribe un nombre';return}
+  try{localStorage.setItem('inv_name',v)}catch(e){}m.style.color='var(--mu)';m.textContent='Guardando…';
+  api({action:'auth'}).then(function(r){m.style.color=r.ok?'var(--g)':'var(--r)';m.textContent=r.ok?'✓ Guardado. Ya aparece en la columna Nombre de tu hoja.':(r.msg||'No se pudo guardar')},function(){m.style.color='var(--r)';m.textContent='Sin conexión: se guardará la próxima vez que haya internet'})}
+function nameCard(){return '<div class="card"><b>Nombre de esta tablet</b><p class="mu">Se escribe solo en la columna Nombre de la hoja de códigos de Google.</p><input id="tn" value="'+esc(tabName())+'" placeholder="Ej: Caja, Mesero 1" maxlength="40" autocomplete="off"><div class="msg" id="tnm"></div><button class="btn o" onclick="setTabName()">Guardar nombre</button></div>'}
 function paperCard(){return '<div class="card"><b>Papel de la comanda</b><label>Ancho</label><select onchange="S.cfg.w=+this.value;save();render()"><option value="80"'+(S.cfg.w!=58?' selected':'')+'>80 mm</option><option value="58"'+(S.cfg.w==58?' selected':'')+'>58 mm (PT-210)</option></select><p class="mu">Es el mismo para todas las tablets.</p></div>'}
-function vPrn(){return vPrn0()+(role==='admin'?paperCard():'')}
+function vPrn(){return vPrn0()+(role==='admin'?nameCard()+paperCard():'')}
 function vPrn0(){
   var op=function(v,l){return '<option value="'+v+'"'+(PM===v?' selected':'')+'>'+l+'</option>'};
   return '<div class="card"><b>🖨 Impresora de este equipo</b><p class="mu">Cada tablet guarda su propia configuración. Papel actual: '+(S.cfg.w==58?'58 mm (PT-210)':'80 mm — para la PT-210 el administrador debe cambiarlo a 58 mm abajo, en esta misma pantalla')+'.</p>'+
@@ -507,7 +512,7 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab=role==='admin'&&!(isDev&&devView==='tabs')?'menu':'pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-24 v18',LASTERR='';
+var APPV='2026-10-24 v19',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
   return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
@@ -531,7 +536,7 @@ function vDevTurnos(){
   return '<div class="card"><b>🧹 Turnos</b><p class="mu">Borra un turno junto con sus ventas (para pruebas).</p>'+(l.length?l.map(function(x){var q=tStats(x);return '<div class="row" style="align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div>'+x.ab.f+' '+x.ab.t+(x.ci?'':' · <b>abierto</b>')+'<br><span class="mu">'+esc(x.u||'')+' · '+money(q.tot)+'</span></div><div style="flex:none"><button class="btn x" onclick="ask(\'t'+x.id+'\')">'+(cf==='t'+x.id?'¿Seguro?':'🗑 Borrar')+'</button></div></div>'}).join(''):'<p class="mu">No hay turnos.</p>')+'</div>'}
 function vDev(){
   var cnt=function(c){return S[c]?S[c].length:0};
-  var rows=[['Versión de la app',APPV],['Equipo',DEV+' (idx '+IDX+')'],['Usuario',uname],['Modo de impresora',PM+(HOST?' · principal':'')],['Internet',navigator.onLine?'sí':'no'],['URL del script',(API||'').slice(0,38)+'…'],['Versión del script',OLDT?'ANTERIOR (falta publicar)':'al día'],['Última sincronización',lastBk||'—'],['Versión de datos',BASE.sv],['Último error',LASTERR||'ninguno']].concat(['ventas','movs','turnos','prods','users','tickets','jobs'].map(function(c){return ['Registros: '+c,cnt(c)]}));
+  var rows=[['Versión de la app',APPV],['Equipo',DEV+' (idx '+IDX+')'],['Nombre de la tablet',tabName()||'—'],['Usuario',uname],['Modo de impresora',PM+(HOST?' · principal':'')],['Internet',navigator.onLine?'sí':'no'],['URL del script',(API||'').slice(0,38)+'…'],['Versión del script',OLDT?'ANTERIOR (falta publicar)':'al día'],['Última sincronización',lastBk||'—'],['Versión de datos',BASE.sv],['Último error',LASTERR||'ninguno']].concat(['ventas','movs','turnos','prods','users','tickets','jobs'].map(function(c){return ['Registros: '+c,cnt(c)]}));
   rows.push(['Tickets cancelados',S.tickets.filter(function(t){return t.cx}).length]);
   return '<div class="card"><b>🛠 Developer — diagnóstico</b>'+rows.map(function(r){return '<div class="tot" style="font-size:15px;padding:4px 0;gap:12px"><span>'+esc(r[0])+'</span><b style="text-align:right;word-break:break-all">'+esc(String(r[1]))+'</b></div>'}).join('')+'<button class="btn s" onclick="doSync()">↻ Sincronizar ahora</button><button class="btn o" onclick="fullResync()">Forzar resincronización completa</button></div>'+vDevData()+vDevTurnos()+vClean()+vDevCfg()}
 function fullResync(){if(!isDev)return;if(!confirm('Se vuelve a descargar todo del servidor y se reenvía lo local. ¿Continuar?'))return;BASE.sv=0;BASE.h={ventas:{},movs:{},turnos:{},prods:{},users:{},tickets:{},jobs:{}};saveBase();doSync()}
@@ -671,9 +676,10 @@ function doPay(){
   S.tickets=S.tickets.filter(function(x){return x.id!==t.id});
   curTk=null;pcat=null;pay=null;save();render();doSync()}
 async function activate(){
-  var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),m=$('gm');
+  var c=($('cd').value||'').trim().toUpperCase().replace(/\s/g,''),nm=(($('cn')||{}).value||'').trim(),m=$('gm');
   if(!c){m.textContent='Escribe el código';return}
-  m.style.color='var(--mu)';m.textContent='Verificando…';CODE=c;
+  if(!nm){m.textContent='Escribe el nombre de esta tablet';return}
+  m.style.color='var(--mu)';m.textContent='Verificando…';CODE=c;try{localStorage.setItem('inv_name',nm)}catch(e){}
   try{var r=await api({action:'auth'});
     if(!r.ok){m.style.color='var(--r)';m.textContent=r.msg||'Código inválido';CODE='';return}
     IDX=r.idx||0;DIDX=IDX;try{localStorage.setItem('inv_code',c);localStorage.setItem('inv_idx',String(IDX))}catch(e){}
