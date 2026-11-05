@@ -131,7 +131,7 @@ function vReg(){
   '<div class="row"><div><label>Cantidad</label><input id="c" type="number" inputmode="decimal" min="0" step="any"></div><div><label>Unidad</label><select id="u"><option>libras</option><option>unidades</option><option>kg</option><option>litros</option><option>cajas</option><option>bolsas</option><option>gramos</option><option>onzas</option><option>ml</option></select></div></div>'+
   '<div class="row"><div><label>Fecha</label><input id="f" type="date" value="'+today()+'"></div><div><label>Nota (opcional)</label><input id="nt"></div></div>'+
   '<div class="row"><button class="btn s" onclick="addMov(\'entrada\')">＋ Agregué</button><button class="btn" onclick="addMov(\'salida\')">－ Retiré</button></div><div class="msg" id="rm"></div></div>'+
-  '<div class="card"><button class="btn o" style="margin:0" onclick="exportInv()">⬇ Exportar inventario a Excel</button><p class="mu" style="margin:8px 0 0">Todo se guarda automáticamente en cada cambio.</p></div>'}
+  '<div class="card"><button class="btn o" style="margin:0" onclick="exportInv()">⬇ Exportar inventario a Excel</button><p class="mu" style="margin:8px 0 0">Todo se guarda automáticamente en cada cambio.</p></div>'+invWipeCard()}
 function addMov(tipo){
   var p=$('p').value.trim(),c=parseFloat($('c').value);
   if(!p||!(c>0)){$('rm').textContent='Escribe el producto y una cantidad mayor a 0';return}
@@ -166,11 +166,14 @@ function stockData(){
     S.movs.forEach(function(m){if(m.p===p){u=m.u;m.tipo==='entrada'?e+=m.c:s+=m.c}});
     var st=n(e-s),r=e>0?st/e:0,est=(st<=0||r<0.2)?['Bajo stock','var(--r)']:(r<0.5?['Mitad de stock','var(--y)']:['Buen stock','var(--g)']);
     return {p:p,u:u,e:n(e),s:n(s),st:st,est:est}})}
+function invWipeCard(){if(role!=='admin')return '';var on=cf==='allinv',n=S.movs.length;
+  return '<div class="card"><b>Empezar el inventario de cero</b><p class="mu">Borra <b>todos</b> los productos del inventario con sus entradas y salidas ('+n+' registro'+(n===1?'':'s')+'). Las recetas, el menú y las ventas no se tocan. Se borra en todas las tablets y no se puede deshacer.</p><button class="btn '+(on?'':'o')+'"'+(on?' style="background:var(--r)"':' style="color:var(--r)"')+' onclick="askInvAll()"'+(n?'':' disabled')+'>'+(on?'⚠ ¿Seguro? Toca otra vez para borrar todo el inventario':'🗑 Borrar todo el inventario')+'</button></div>'}
+function askInvAll(){if(role!=='admin'||!S.movs.length)return;if(cf!=='allinv'){cf='allinv';render();return}cf='';S.movs=[];save();render();doSync()}
 function delItem(i){if(role!=='admin')return;var d=stockData()[i];if(!d)return;var k='i'+d.p;if(cf!==k){cf=k;render();return}cf='';S.movs=S.movs.filter(function(m){return m.p!==d.p});save();render()}
 function vStk(){
   var d=stockData();
   return '<div class="card">'+(d.length?d.map(function(x,ix){return '<div style="padding:9px 0;border-bottom:1px solid var(--bd)"><div style="display:flex;justify-content:space-between;align-items:center"><b>'+esc(x.p)+'</b><span class="pill" style="background:'+x.est[1]+'">'+x.est[0]+'</span></div><div class="mu">Total entradas: '+x.e+' '+esc(x.u)+' · Total salidas: '+x.s+' '+esc(x.u)+'</div><div>Stock actual: <b>'+x.st+' '+esc(x.u)+'</b></div>'+(role==='admin'?'<button class="btn x" style="margin-top:8px;color:var(--r)" onclick="delItem('+ix+')">'+(cf==='i'+x.p?'⚠ Se borran todas sus entradas y salidas. Toca otra vez para confirmar':'🗑 Eliminar del inventario')+'</button>':'')+'</div>'}).join(''):'<p class="mu">Aún no hay productos. Ve a Registro.</p>')+
-  '<p class="mu">🟢 Buen stock: más de 50% de lo que ha entrado · 🟡 Mitad: 20%–50% · 🔴 Bajo: menos de 20% o agotado.</p></div>'}
+  '<p class="mu">🟢 Buen stock: más de 50% de lo que ha entrado · 🟡 Mitad: 20%–50% · 🔴 Bajo: menos de 20% o agotado.</p></div>'+invWipeCard()}
 
 /* ---------- Venta del día ---------- */
 function vVen(){
@@ -516,7 +519,7 @@ function enter(){
   goIn()}
 function goIn(){auth=true;hd=vd=today();tab=role==='admin'&&!(isDev&&devView==='tabs')?'menu':'pos';save();render()}
 /* --- Usuario Developer: acceso total (como administrador) con su propio PIN + pestaña de diagnóstico --- */
-var APPV='2026-10-31 v20',LASTERR='';
+var APPV='2026-11-03 v21',LASTERR='';
 function vDevCfg(){
   if(!isDev)return '';
   return '<div class="card"><b>🛠 PIN del Developer</b><p class="mu">'+(S.cfg.dpin?'Estás usando un PIN personalizado.':'Estás usando el PIN por defecto.')+'</p><input id="dp" type="text" class="pw" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" inputmode="numeric" placeholder="Nuevo PIN del Developer (mín. 4)"><button class="btn s" onclick="setDevPin()">Cambiar PIN</button>'+(S.cfg.dpin?'<button class="btn o" onclick="rmDev()">Volver al PIN por defecto</button>':'')+'<div class="msg" id="dm"></div></div>'}
