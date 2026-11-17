@@ -155,7 +155,7 @@ function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){ret
 /* ---------- Estructura ---------- */
 function render(){
   saveSess(false);
-  if(API.indexOf('https://script.google.com/macros/s/AKfycbxUhamLt4vBE716NhrB6kp6mcI-kLBPYm5s6ZB9nWtwY-Xc8hlXPLzL07MCm5AFAh3e/exec')===0)return apiView();
+  if(API.indexOf('PEGA_AQUI')===0)return apiView();
   if(gate!=='ok')return gateView();
   if(!auth)return lockView();
   if(role!=='admin'&&tab!=='pos'&&tab!=='ord'&&tab!=='prn')tab='pos';var grid=role==='admin'&&!(isDev&&devView==='tabs');if(tab==='prd')tab='rec';if(role==='admin'){if(grid){if(!ATIT[tab]&&tab!=='menu')tab='menu'}else if(tab==='menu')tab='pos';else if(tab==='usr')tab='set'}if(tab==='dev'&&!isDev)tab=role==='admin'?'menu':'pos';
@@ -272,7 +272,7 @@ function exportVen(){saveXlsx(wbVen(),'ventas_'+today()+'.xlsx')}
 
 
 /* ====== CONFIGURACIÓN: pega aquí la URL de tu Apps Script ====== */
-var API='PEGA_AQUI_LA_URL_DE_TU_SCRIPT';
+var API='https://script.google.com/macros/s/AKfycbxprqrU3OvVLeWVQTOfjWSU6qHpPek-Oml0PNhcvL0JeBtVg5RzhyYx7mwAno5jvN8C/exec';
 try{if(API.indexOf('http')===0)localStorage.setItem('inv_api',API);else{var _a=localStorage.getItem('inv_api');if(_a)API=_a}}catch(e){}
 function apiOk(){return API.indexOf('http')===0}
 function saveApi(){var v=($('au').value||'').trim();if(v.indexOf('https://script.google.com/')!==0){$('gm').textContent='Esa no parece la URL del script (debe empezar con https://script.google.com/)';return}API=v;try{localStorage.setItem('inv_api',v)}catch(e){}init()}
@@ -839,6 +839,44 @@ function rxEditProd(i){
 function rxList(){
   var cats={},ord=[];S.prods.forEach(function(p,i){var c=catOf(p);if(!cats[c]){cats[c]=[];ord.push(c)}cats[c].push(i)});
   return ord.map(function(c){return '<div class="rxcat">'+esc(c)+'<span>'+cats[c].length+'</span></div>'+cats[c].map(function(i){var p=S.prods[i],k=(p.rec||[]).filter(rxOkL).length;return '<button class="rxrow" onclick="rxSel='+i+';render()"><div style="min-width:0"><b>'+esc(p.n)+'</b>'+(p.hid?' <span class="mu">🙈 oculto</span>':'')+'<div class="mu">'+(k?k+' ingrediente'+(k>1?'s':''):'<span class="rxno">Sin receta</span>')+'</div></div><div class="rxpr">'+money(p.pr)+'<span>›</span></div></button>'}).join('')}).join('')}
+/* ====== RESPALDO DEL MENÚ (solo administrador) ======
+   Crear respaldo: guarda en la hoja de Google una copia de todos los productos (precio, categoría, receta, ocultos) y las preparaciones.
+   Restaurar menú: elige un respaldo (manual o automático diario), los productos borrados, o el menú rescatado. */
+var MBK=null,MBKmsg='',MBKbusy=false;
+function mbkCard(){
+  if(role!=='admin')return '';
+  return '<div class="card"><b>🛟 Respaldo del menú</b><p class="mu" style="margin:4px 0 10px">Copia de todos los productos, precios, recetas y preparaciones en tu hoja de Google. Además se guarda uno automático cada día.</p>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn s" style="width:auto;flex:1;margin:0" '+(MBKbusy?'disabled ':'')+'onclick="mbkCreate()">💾 Crear respaldo</button>'+
+    '<button class="btn o" style="width:auto;flex:1;margin:0" '+(MBKbusy?'disabled ':'')+'onclick="'+(MBK?'MBK=null;MBKmsg=\'\';render()':'mbkOpen()')+'">'+(MBK?'✕ Cerrar':'♻ Restaurar menú')+'</button></div>'+
+    (MBKmsg?'<p class="mu" style="margin-top:10px">'+esc(MBKmsg)+'</p>':'')+(MBK?mbkPanel():'')+'</div>'}
+function mbkRow(title,sub,btn,src,lbl){return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--bd)"><div style="min-width:0"><b>'+esc(title)+'</b><div class="mu">'+esc(sub)+'</div></div><button class="btn o" style="width:auto;margin:0;padding:8px 12px;flex:none" '+(MBKbusy?'disabled ':'')+'onclick="mbkRestore(\''+src+'\',\''+esc(lbl).replace(/'/g,'')+'\')">'+btn+'</button></div>'}
+function mbkPanel(){
+  var r=MBK,h2='<div style="margin-top:12px">';
+  if(r.borrados)h2+=mbkRow('Productos borrados ('+r.borrados+')','Devuelve los productos que se borraron del menú','Recuperar','borrados','los productos borrados');
+  if(r.rescate)h2+=mbkRow('Menú rescatado ('+r.rescate+' productos)','Los que se rescataron el 17-nov · sin recetas · solo agrega los que falten','Agregar faltantes','rescate','el menú rescatado');
+  h2+=(r.list.length?r.list.map(function(x){var ic=x.tipo==='manual'?'💾':x.tipo==='automático'?'🕐':'↩';
+      return mbkRow(ic+' '+x.f+' '+x.t+' · '+x.n+' productos',(x.tipo==='antes de restaurar'?'Copia de antes de restaurar (para deshacer)':x.tipo==='automático'?'Automático del día':'Manual')+(x.por&&x.tipo!=='automático'?' · '+x.por:''),'Restaurar','snap:'+x.id,'el respaldo del '+x.f+' '+x.t)}).join('')
+    :'<p class="mu" style="border-top:1px solid var(--bd);padding-top:10px">Aún no hay respaldos guardados. Toca «Crear respaldo».</p>');
+  return h2+'</div>'}
+async function mbkCreate(){if(role!=='admin'||MBKbusy)return;MBKbusy=true;MBKmsg='Guardando respaldo…';render();
+  try{await doSync();var r=await api({action:'menuBackup',by:uname});if(!r.ok)throw new Error(r.msg||'Acción desconocida');
+    MBKmsg='✓ Respaldo guardado: '+r.n+' productos ('+r.f+' '+r.t+')';if(MBK)await mbkLoad()}
+  catch(e){MBKmsg='⚠ No se pudo crear el respaldo: '+(e.net?'sin conexión':e.message==='Acción desconocida'?'falta publicar la nueva versión del script de Google':e.message)}
+  MBKbusy=false;render()}
+async function mbkLoad(){var r=await api({action:'menuBackups'});if(!r.ok)throw new Error(r.msg||'Acción desconocida');MBK=r}
+async function mbkOpen(){if(role!=='admin'||MBKbusy)return;MBKbusy=true;MBKmsg='Buscando respaldos…';render();
+  try{await mbkLoad();MBKmsg='Elige qué quieres restaurar:'}
+  catch(e){MBK=null;MBKmsg='⚠ No se pudieron ver los respaldos: '+(e.net?'sin conexión':e.message==='Acción desconocida'?'falta publicar la nueva versión del script de Google':e.message)}
+  MBKbusy=false;render()}
+async function mbkRestore(src,lbl){if(role!=='admin'||MBKbusy)return;
+  var snap=src.indexOf('snap:')===0;
+  if(!confirm('¿Restaurar '+lbl+'?\n\n'+(snap?'Los productos y preparaciones vuelven a quedar como estaban en ese respaldo (precio, categoría, receta). Lo que creaste después se queda. Antes se guarda una copia del menú actual por si quieres deshacer.':'Solo se agregan los productos que falten; no se cambia nada de lo que ya está.')))return;
+  MBKbusy=true;MBKmsg='Restaurando…';render();
+  try{await doSync();var r=await api({action:'menuRestore',src:src,by:uname});if(!r.ok)throw new Error(r.msg||'Acción desconocida');
+    MBKmsg=(r.added||r.updated||r.preps)?'✓ Listo: '+r.added+' producto(s) agregado(s), '+r.updated+' actualizado(s)'+(r.preps?', '+r.preps+' preparación(es)':'')+'. Las demás tablets lo reciben solas.':'✓ No había nada que cambiar: el menú ya estaba igual.';
+    await doSync();await mbkLoad()}
+  catch(e){MBKmsg='⚠ No se pudo restaurar: '+(e.net?'sin conexión':e.message==='Acción desconocida'?'falta publicar la nueva versión del script de Google':e.message)}
+  MBKbusy=false;render()}
 function rxNewForm(){
   return '<div class="card"><b>Nuevo producto</b>'+catList()+'<label>Nombre</label><input id="npn" placeholder="Ej: Tacos de pastor"><div class="row"><div><label>Precio ($)</label><input id="npp" type="number" inputmode="decimal" step="any" min="0" placeholder="0.00"></div><div><label>Categoría</label><input id="npc" list="dcat" placeholder="Ej: Taco"></div></div><div class="msg" id="npm"></div><button class="btn s" onclick="rxCreate()">Crear y agregar receta →</button><button class="btn o" onclick="rxNew=false;render()">Cancelar</button></div>'}
 function vRec(){
@@ -852,7 +890,7 @@ function vRec(){
     return dl+seg+'<div class="card"><b>Preparaciones</b><p class="mu">Una preparación es una receta base que se usa dentro de otras, como el chimol. En la receta de un producto la agregas como un ingrediente más (ej. «Chimol 100 g») y la app descuenta tomate, cebolla, cilantro, limón y sal en proporción.</p>'+
       (rxPreps().length?rxPreps().map(function(p,i){return '<button class="rxrow" onclick="rxPrep='+i+';render()"><div style="min-width:0"><b>'+esc(p.n)+'</b><div class="mu">'+(p.ing||[]).filter(rxOkL).length+' ingredientes</div></div><div class="rxpr">rinde '+(p.y||0)+' '+esc(p.u)+'<span>›</span></div></button>'}).join(''):'<p class="mu">Aún no hay preparaciones.</p>')+'<button class="btn s" onclick="rxNewPrep()">＋ Nueva preparación</button></div>';
   var sin=S.prods.filter(function(p){return !(p.rec||[]).some(rxOkL)}).length;
-  return dl+seg+msg+(rxNew?rxNewForm():'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="min-width:0"><b>'+S.prods.length+' producto'+(S.prods.length===1?'':'s')+'</b><div class="mu">'+(sin?'<span class="rxno">'+sin+' sin receta</span> · toca un producto para editarlo':'Todos tienen receta · toca uno para editarlo')+'</div></div><button class="btn s" style="width:auto;margin:0;padding:10px 16px" onclick="rxNew=true;render()">＋ Nuevo producto</button></div></div>')+
+  return dl+seg+msg+mbkCard()+(rxNew?rxNewForm():'<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div style="min-width:0"><b>'+S.prods.length+' producto'+(S.prods.length===1?'':'s')+'</b><div class="mu">'+(sin?'<span class="rxno">'+sin+' sin receta</span> · toca un producto para editarlo':'Todos tienen receta · toca uno para editarlo')+'</div></div><button class="btn s" style="width:auto;margin:0;padding:10px 16px" onclick="rxNew=true;render()">＋ Nuevo producto</button></div></div>')+
     (S.prods.length?rxList():'<p class="mu">Aún no hay productos. Toca «Nuevo producto» para crear el primero.</p>')+
     '<div class="card" style="margin-top:14px"><b>Recetas del Imperio</b><p class="mu">Carga de una vez las recetas de asada, birria, chilaquiles, gringa, nachos y birriamen, más la preparación de chimol, en los productos que se llamen igual.</p><button class="btn o" onclick="rxSeed()">⬇ Cargar recetas del Imperio</button></div>'}
 
