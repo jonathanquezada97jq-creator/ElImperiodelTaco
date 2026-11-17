@@ -845,7 +845,7 @@ function rxList(){
 var MBK=null,MBKmsg='',MBKbusy=false;
 function mbkCard(){
   if(role!=='admin')return '';
-  return '<div class="card"><b>🛟 Respaldo del menú</b><p class="mu" style="margin:4px 0 10px">Copia de todos los productos, precios, recetas y preparaciones en tu hoja de Google. Además se guarda uno automático cada día.</p>'+
+  return '<div class="card"><b>🛟 Respaldo del menú</b><p class="mu" style="margin:4px 0 10px">Copia de todos los productos, precios, recetas y preparaciones. Además se guarda uno automático cada día.</p>'+
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn s" style="width:auto;flex:1;margin:0" '+(MBKbusy?'disabled ':'')+'onclick="mbkCreate()">💾 Crear respaldo</button>'+
     '<button class="btn o" style="width:auto;flex:1;margin:0" '+(MBKbusy?'disabled ':'')+'onclick="'+(MBK?'MBK=null;MBKmsg=\'\';render()':'mbkOpen()')+'">'+(MBK?'✕ Cerrar':'♻ Restaurar menú')+'</button></div>'+
     (MBKmsg?'<p class="mu" style="margin-top:10px">'+esc(MBKmsg)+'</p>':'')+(MBK?mbkPanel():'')+'</div>'}
