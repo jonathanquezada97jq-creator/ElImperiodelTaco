@@ -155,7 +155,7 @@ function pick(v){if(!v)return;$('p').value=v;var l=S.movs.filter(function(m){ret
 /* ---------- Estructura ---------- */
 function render(){
   saveSess(false);
-  if(API.indexOf('PEGA_AQUI')===0)return apiView();
+  if(API.indexOf('https://script.google.com/macros/s/AKfycbxUhamLt4vBE716NhrB6kp6mcI-kLBPYm5s6ZB9nWtwY-Xc8hlXPLzL07MCm5AFAh3e/exec')===0)return apiView();
   if(gate!=='ok')return gateView();
   if(!auth)return lockView();
   if(role!=='admin'&&tab!=='pos'&&tab!=='ord'&&tab!=='prn')tab='pos';var grid=role==='admin'&&!(isDev&&devView==='tabs');if(tab==='prd')tab='rec';if(role==='admin'){if(grid){if(!ATIT[tab]&&tab!=='menu')tab='menu'}else if(tab==='menu')tab='pos';else if(tab==='usr')tab='set'}if(tab==='dev'&&!isDev)tab=role==='admin'?'menu':'pos';
